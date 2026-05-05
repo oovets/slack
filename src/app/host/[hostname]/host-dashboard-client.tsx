@@ -1134,11 +1134,14 @@ function Inner({ host }: { host: string }) {
         <Box id="block-visibility-metrics" title="Visibility" style={boxStyles}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {visibilityMetrics.map((metric) => (
-              <InsightCard
+              <VisualStatCard
                 key={metric.title}
                 title={metric.title}
                 value={metric.value}
                 detail={metric.detail}
+                progress={metric.progress}
+                caption={metric.caption}
+                tone={metric.tone}
               />
             ))}
           </div>
