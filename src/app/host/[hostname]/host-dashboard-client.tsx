@@ -427,6 +427,11 @@ const toolbarPillClass = cn(
   "gap-1.5 px-3",
 );
 
+/** Compact mode shrinks paddings, fonts, and hides verbose details across
+ *  every card without changing the underlying values. Read with `useCompact()`. */
+const CompactContext = createContext(false);
+const useCompact = () => useContext(CompactContext);
+
 /* ============================================================
  * Layout
  * ============================================================ */
