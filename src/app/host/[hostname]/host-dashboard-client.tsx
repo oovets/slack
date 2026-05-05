@@ -1795,6 +1795,83 @@ function InsightCard({
   );
 }
 
+/**
+ * VisualStatCard — number-forward card with a coloured accent bar and an
+ * optional progress fill. Used by Visibility and Dual-camera grids so values
+ * read at a glance without parsing rows of text.
+ */
+function VisualStatCard({
+  title,
+  value,
+  detail,
+  /** 0–100. Drives the progress bar fill. */
+  progress,
+  /** Optional secondary number on the right (e.g. peer total). */
+  caption,
+  tone = "neutral",
+  icon,
+}: {
+  title: string;
+  value: string;
+  detail?: string;
+  progress?: number;
+  caption?: string;
+  tone?: "neutral" | "positive" | "warn" | "bad" | "accent";
+  icon?: React.ReactNode;
+}) {
+  const toneColor = {
+    neutral: "#1f1f1f",
+    positive: "#10b981",
+    warn: "#f59e0b",
+    bad: "#ef4444",
+    accent: "#DA7C60",
+  }[tone];
+  const pct = progress == null ? null : Math.max(0, Math.min(100, progress));
+  return (
+    <div className="relative overflow-hidden rounded-md border border-black/5 bg-white px-5 py-5">
+      <span
+        aria-hidden
+        className="absolute left-0 top-0 h-full w-1"
+        style={{ background: toneColor }}
+      />
+      <div className="flex items-start justify-between gap-3">
+        <p className="eidra-sans text-[12px] font-bold uppercase tracking-[0.08em] text-black/55">
+          {title}
+        </p>
+        {icon ? (
+          <span className="text-black/35" aria-hidden>
+            {icon}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <p
+          className="eidra-sans text-[42px] font-bold leading-[44px] tabular-nums tracking-tight"
+          style={{ color: toneColor, textRendering: "geometricPrecision" }}
+        >
+          {value}
+        </p>
+        {caption ? (
+          <span className="eidra-sans text-[13px] font-bold text-black/35 tabular-nums">
+            {caption}
+          </span>
+        ) : null}
+      </div>
+      {pct != null ? (
+        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
+          <div
+            className="h-full rounded-full transition-[width] duration-500 ease-out"
+            style={{ width: `${pct}%`, background: toneColor }}
+          />
+        </div>
+      ) : null}
+      {detail ? (
+        <p className="pp-neue-montreal mt-3 text-xs font-medium text-black/45">{detail}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function TagScopePanel({
   target,
 }: {
