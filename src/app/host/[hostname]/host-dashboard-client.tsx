@@ -1722,6 +1722,7 @@ function BleCsiTab({
   data: BleCsiResponse | undefined;
   timeRange: TimeRange;
 }) {
+  const compact = useCompact();
   const ble = data?.ble;
   const scanner = data?.scannerHealth;
   const reachQuality =
@@ -1737,11 +1738,13 @@ function BleCsiTab({
     <>
       <h1
         id="dashboard-ble-csi-title"
-        className="eidra-sans mt-2 text-center text-[60px] leading-[60px]"
+        className={cn(
+          "eidra-sans text-center font-bold tracking-tight text-black",
+          compact ? "mt-0 text-[20px] leading-[24px]" : "mt-2 text-[60px] leading-[60px]",
+        )}
         style={{ textRendering: "geometricPrecision" }}
       >
-        <span className="font-medium text-black/55">BLE / CSI from </span>
-        <span className="font-bold text-black">{data?.host ?? "host"}</span>
+        BLE / CSI from {data?.host ?? "host"}
       </h1>
 
       <Box id="block-ble-csi-kpis" style={boxStyles}>
