@@ -27,7 +27,6 @@ import {
   Play,
   Thermometer,
   Wifi,
-  WifiOff,
   Zap,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -463,7 +462,6 @@ function Inner({ host }: { host: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isTagTarget = host.startsWith("tag:");
   const encodedTarget = encodeURIComponent(host);
-  const targetLabel = isTagTarget ? formatTagLabel(host) : host;
   useEffect(() => {
     if (isTagTarget) setDashboardTab("vision");
   }, [isTagTarget]);
@@ -503,13 +501,6 @@ function Inner({ host }: { host: string }) {
     }
     return timeRanges[timeRangeKey === "custom" ? "today" : timeRangeKey];
   }, [timeRangeKey, customRange, timeRanges]);
-  const heroTitle = useMemo(() => {
-    if (timeRangeKey === "yesterday") return `Yesterday metrics from ${targetLabel}`;
-    if (timeRangeKey === "7d") return `Last week metrics from ${targetLabel}`;
-    if (timeRangeKey === "today") return `Today metrics from ${targetLabel}`;
-    if (timeRangeKey === "custom") return `${timeRange.label} metrics from ${targetLabel}`;
-    return `Live metrics from ${targetLabel}`;
-  }, [timeRangeKey, targetLabel, timeRange.label]);
 
   // MJPEG cache-bust tick
   useEffect(() => {
@@ -941,6 +932,7 @@ function Inner({ host }: { host: string }) {
         postfix: "%",
         decimals: 1,
         detail: "Unique contacts / aggregated audience",
+        icon: <Camera className="h-9 w-9 text-white" />,
         progress: totals.lookedAtScreenPct,
         tone: "positive" as const,
       },
@@ -950,6 +942,7 @@ function Inner({ host }: { host: string }) {
         postfix: "%",
         decimals: 1,
         detail: "Audience not converted into contacts",
+        icon: <AlertTriangle className="h-9 w-9 text-white" />,
         progress: totals.lookedAwayPct,
         tone: "warn" as const,
       },
@@ -959,6 +952,7 @@ function Inner({ host }: { host: string }) {
         postfix: "s",
         decimals: 1,
         detail: "Total observation time / unique contacts",
+        icon: <Clock className="h-9 w-9 text-white" />,
         tone: "neutral" as const,
       },
       {
@@ -967,6 +961,7 @@ function Inner({ host }: { host: string }) {
         postfix: "m",
         decimals: 1,
         detail: "All looking-at-screen observations",
+        icon: <Clock className="h-9 w-9 text-white" />,
         tone: "accent" as const,
       },
       {
@@ -974,6 +969,7 @@ function Inner({ host }: { host: string }) {
         number: totals.unique,
         caption: totalHumans ? `/ ${formatMetricNumber(totalHumans)}` : undefined,
         detail: "Deduped people with camera attention",
+        icon: <Activity className="h-9 w-9 text-white" />,
         progress: pctOf(totals.unique),
         tone: "positive" as const,
       },
@@ -981,6 +977,7 @@ function Inner({ host }: { host: string }) {
         title: "Total humans",
         number: totals.detections,
         detail: "All analytics records in the window",
+        icon: <Activity className="h-9 w-9 text-white" />,
         tone: "neutral" as const,
       },
       {
@@ -988,6 +985,7 @@ function Inner({ host }: { host: string }) {
         number: totals.notReached,
         caption: totalHumans ? `/ ${formatMetricNumber(totalHumans)}` : undefined,
         detail: "Total humans minus unique contacts",
+        icon: <AlertTriangle className="h-9 w-9 text-white" />,
         progress: pctOf(totals.notReached),
         tone: "bad" as const,
       },
@@ -1059,19 +1057,6 @@ function Inner({ host }: { host: string }) {
             />
           </div>
 
-          {isTagTarget ? (
-            <Pill
-              tone={isOnline ? "good" : "warn"}
-              icon={<Wifi className="h-3.5 w-3.5" />}
-              label={`${summary?.target?.online_count ?? 0}/${summary?.target?.host_count ?? 0} online`}
-            />
-          ) : (
-            <Pill
-              tone={isOnline ? "good" : "bad"}
-              icon={isOnline ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-              label={isOnline ? "Online" : "Offline"}
-            />
-          )}
           {overallHealth.length === 0 ? (
             <Pill tone="good" icon={<Activity className="h-3.5 w-3.5" />} label="Healthy" />
           ) : (
@@ -1225,6 +1210,7 @@ function Inner({ host }: { host: string }) {
                 decimals={metric.decimals}
                 detail={metric.detail}
                 caption={metric.caption}
+                icon={metric.icon}
               />
             ))}
           </div>
@@ -1285,7 +1271,7 @@ function Inner({ host }: { host: string }) {
 
         {/* NETWORK — current rx/tx + 30 min sparkline */}
         <Box id="block-network" title="Network" style={boxStyles}>
-          <div className="grid grid-cols-1 gap-x-2 gap-y-3 lg:grid-cols-[auto,auto,1fr]">
+          <div className="grid grid-cols-2 gap-x-2 gap-y-3 xl:grid-cols-[auto_auto_minmax(0,1fr)]">
             <KpiTile
               icon={<ArrowDown className="h-9 w-9 text-white" />}
               label="RX Mbps"
@@ -1298,7 +1284,9 @@ function Inner({ host }: { host: string }) {
               value={network?.tx_mbps ?? null}
               decimals={2}
             />
-            <NetworkSparklines network={network} />
+            <div className="col-span-2 min-w-0 xl:col-span-1">
+              <NetworkSparklines network={network} />
+            </div>
           </div>
         </Box>
 
@@ -1724,7 +1712,7 @@ function DashboardTabs({
   const tabs: { key: DashboardTab; label: string }[] = showBleCsi
     ? [
         { key: "vision", label: "Vision" },
-        { key: "bleCsi", label: "BLE / CSI" },
+        { key: "bleCsi", label: "BLE" },
       ]
     : [{ key: "vision", label: "Vision" }];
   return (
@@ -1759,7 +1747,6 @@ function BleCsiTab({
   data: BleCsiResponse | undefined;
   timeRange: TimeRange;
 }) {
-  const compact = useCompact();
   const ble = data?.ble;
   const scanner = data?.scannerHealth;
   const reachQuality =
@@ -1903,15 +1890,9 @@ function InsightCard({
 }
 
 /**
- * VisualStatCard — number-forward card with a coloured accent bar and an
- * optional progress fill. Used by Visibility and Dual-camera grids so values
- * read at a glance without parsing rows of text.
- */
-/**
  * VisualStatCard — matches the dashboard's MetricItem typography (eidra-sans
- * medium label + huge bold number) so Visibility / Dual-camera grids look
- * native to the rest of the dashboard. No borders, no accent strips, no
- * uppercase tracking — just the same type system every other Box uses.
+ * medium label + huge bold number) and the same gradient icon tile used by the
+ * Vision KPI cards.
  */
 function VisualStatCard({
   title,
@@ -1920,6 +1901,7 @@ function VisualStatCard({
   decimals = 0,
   detail,
   caption,
+  icon,
 }: {
   title: string;
   number: number | null | undefined;
@@ -1936,51 +1918,76 @@ function VisualStatCard({
   const displayValue =
     number != null && !isNaN(number) ? Number(number.toFixed(decimals)) : null;
   const compact = useCompact();
+  const formatted = Math.abs(Number(displayValue ?? 0)).toFixed(decimals);
+  const intDigits = formatted.split(".")[0].length;
+  const thousandsSeps = Math.max(0, Math.floor((intDigits - 1) / 3));
+  const visibleLen =
+    formatted.length +
+    thousandsSeps +
+    (postfix ? postfix.length : 0) +
+    (caption ? caption.length : 0);
+  let numberSizeClass = compact ? "text-[22px] leading-[24px]" : "text-[57px] leading-[60px]";
+  if (!compact) {
+    if (visibleLen >= 11) numberSizeClass = "text-[32px] leading-[36px]";
+    else if (visibleLen >= 9) numberSizeClass = "text-[40px] leading-[44px]";
+    else if (visibleLen >= 7) numberSizeClass = "text-[48px] leading-[52px]";
+  }
   return (
-    <div className={cn("flex flex-col", compact ? "p-2" : "p-2")}>
-      <h2
+    <div className={cn("flex flex-row", compact ? "p-2" : "p-2")}>
+      <div
         className={cn(
-          "eidra-sans whitespace-nowrap font-medium text-black",
-          compact ? "text-[12px]" : "text-[15px]",
+          "flex flex-shrink-0 items-center justify-center rounded-md transition-colors",
+          compact ? "h-[52px] w-[52px]" : "h-[90px] w-[90px]",
         )}
-        style={{ textRendering: "geometricPrecision" }}
+        style={{ background: "linear-gradient(135deg, #63A8A5 0%, #DA7C60 100%)" }}
       >
-        {title}
-      </h2>
-      <h1
-        className={cn(
-          "eidra-sans -ml-[2px] flex items-baseline font-bold tabular-nums text-black",
-          compact ? "text-[22px] leading-[24px]" : "text-[57px] leading-[60px]",
-        )}
-        style={{ textRendering: "geometricPrecision" }}
-      >
-        {displayValue == null ? (
-          <span className="text-black/30">—</span>
-        ) : (
-          <SlidingNumber
-            animateOnLoad={false}
-            decimalPlaces={decimals}
-            number={displayValue}
-            decimalSeparator=","
-            postfix={postfix}
-          />
-        )}
-        {caption ? (
-          <span
-            className={cn(
-              "eidra-sans ml-1.5 font-medium text-black/35",
-              compact ? "text-[10px]" : "text-[14px]",
-            )}
-          >
-            {caption}
-          </span>
+        {icon ?? <Activity className={compact ? "h-6 w-6 text-white" : "h-9 w-9 text-white"} />}
+      </div>
+      <div className={cn("min-w-0 text-black", compact ? "pl-2" : "pl-3")}>
+        <h2
+          className={cn(
+            "eidra-sans whitespace-nowrap font-medium text-black",
+            compact ? "text-[12px]" : "text-[15px]",
+          )}
+          style={{ textRendering: "geometricPrecision" }}
+        >
+          {title}
+        </h2>
+        <h1
+          className={cn(
+            "eidra-sans -ml-[2px] flex items-baseline font-bold tabular-nums text-black",
+            numberSizeClass,
+          )}
+          style={{ textRendering: "geometricPrecision" }}
+        >
+          {displayValue == null ? (
+            <span className="text-black/30">—</span>
+          ) : (
+            <SlidingNumber
+              animateOnLoad={false}
+              decimalPlaces={decimals}
+              number={displayValue}
+              decimalSeparator=","
+              postfix={postfix}
+            />
+          )}
+          {caption ? (
+            <span
+              className={cn(
+                "eidra-sans ml-1.5 font-medium text-black/35",
+                compact ? "text-[10px]" : "text-[14px]",
+              )}
+            >
+              {caption}
+            </span>
+          ) : null}
+        </h1>
+        {detail && !compact ? (
+          <p className="pp-neue-montreal mt-1 text-[12px] font-medium text-black/50">
+            {detail}
+          </p>
         ) : null}
-      </h1>
-      {detail && !compact ? (
-        <p className="pp-neue-montreal mt-1 text-[12px] font-medium text-black/50">
-          {detail}
-        </p>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -2058,6 +2065,8 @@ function AnalyticsTrendPanel({
 }
 
 function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
+  const compact = useCompact();
+
   if (!insight) {
     return <EmptyPanel label="Dual-camera insight is not available for this window." />;
   }
@@ -2072,17 +2081,13 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
   );
 
   const confidence = insight.confidence_score ?? 0;
-  const confidenceTone: "positive" | "warn" | "bad" =
-    confidence >= 75 ? "positive" : confidence >= 45 ? "warn" : "bad";
   const angleAgreement = insight.angle_agreement_pct ?? 0;
   const synced = insight.synced_bucket_pct ?? 0;
   const rawSum = insight.raw_camera_unique_sum ?? 0;
-  const dedupePct = rawSum > 0 ? ((insight.double_count_prevented ?? 0) / rawSum) * 100 : 0;
   const maxCamDetections = Math.max(1, ...cameras.map((c) => c.total_detections));
   const maxCamRac = Math.max(1, ...cameras.map((c) => c.rac));
   const maxCamUnique = Math.max(1, ...cameras.map((c) => c.unique_persons));
 
-  const compact = useCompact();
   return (
     <div className={compact ? "space-y-3" : "space-y-8"}>
       {/* Headline KPIs — same MetricItem-style typography as the rest of the
@@ -2101,6 +2106,7 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
           postfix="%"
           decimals={1}
           detail="Overlap, detection balance, RAC balance"
+          icon={<Activity className="h-9 w-9 text-white" />}
         />
         <VisualStatCard
           title="Angle agreement"
@@ -2108,12 +2114,14 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
           postfix="%"
           decimals={1}
           detail={`${formatMetricNumber(insight.confirmed_by_multiple_angles ?? 0)} confirmed by multiple angles`}
+          icon={<Camera className="h-9 w-9 text-white" />}
         />
         <VisualStatCard
           title="Double-count prevented"
           number={insight.double_count_prevented ?? 0}
           caption={rawSum ? `/ ${formatMetricNumber(rawSum)}` : undefined}
           detail="Raw camera contacts deduplicated"
+          icon={<Database className="h-9 w-9 text-white" />}
         />
         <VisualStatCard
           title="Synced activity"
@@ -2121,6 +2129,7 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
           postfix="%"
           decimals={1}
           detail={`${formatMetricNumber(insight.synced_bucket_count ?? 0)} / ${formatMetricNumber(insight.active_bucket_count ?? 0)} active buckets`}
+          icon={<Activity className="h-9 w-9 text-white" />}
         />
       </div>
 
@@ -2312,31 +2321,6 @@ function AngleAward({
           {camera?.camera_id ?? "—"}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function DualCameraKpiCard({
-  title,
-  value,
-  detail,
-}: {
-  title: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-md border border-black/5 bg-white px-5 py-5">
-      <p className="pp-neue-montreal text-[13px] font-medium text-black/55">{title}</p>
-      <p
-        className="pp-neue-montreal mt-2 text-[42px] font-bold leading-[44px] text-black"
-        style={{ textRendering: "geometricPrecision" }}
-      >
-        {value}
-      </p>
-      <p className="pp-neue-montreal mt-2 truncate font-mono text-xs font-medium text-black/45">
-        {detail}
-      </p>
     </div>
   );
 }
