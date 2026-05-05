@@ -1161,6 +1161,30 @@ function Inner({ host }: { host: string }) {
           <MetricsSection metricItems={nextmMetrics} columns={4} />
         </Box>
 
+        <Box id="block-visibility-metrics" title="Visibility" style={boxStyles}>
+          <div
+            className={cn(
+              "grid",
+              compact
+                ? "grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7"
+                : "grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-3 xl:grid-cols-4",
+            )}
+          >
+            {visibilityMetrics.map((metric) => (
+              <VisualStatCard
+                key={metric.title}
+                title={metric.title}
+                number={metric.number}
+                postfix={metric.postfix}
+                decimals={metric.decimals}
+                detail={metric.detail}
+                caption={metric.caption}
+                icon={metric.icon}
+              />
+            ))}
+          </div>
+        </Box>
+
         {!isTagTarget ? (
           <Box id="block-live-operational-kpis" style={boxStyles}>
             <div className="grid grid-cols-2 gap-x-2 gap-y-3 md:grid-cols-3 xl:grid-cols-6">
@@ -1246,30 +1270,6 @@ function Inner({ host }: { host: string }) {
             <DualCameraInsightPanel insight={dualCamera} />
           </Box>
         ) : null}
-
-        <Box id="block-visibility-metrics" title="Visibility" style={boxStyles}>
-          <div
-            className={cn(
-              "grid",
-              compact
-                ? "grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7"
-                : "grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-3 xl:grid-cols-4",
-            )}
-          >
-            {visibilityMetrics.map((metric) => (
-              <VisualStatCard
-                key={metric.title}
-                title={metric.title}
-                number={metric.number}
-                postfix={metric.postfix}
-                decimals={metric.decimals}
-                detail={metric.detail}
-                caption={metric.caption}
-                icon={metric.icon}
-              />
-            ))}
-          </div>
-        </Box>
 
         {!isTagTarget ? (
           <>
@@ -2727,6 +2727,7 @@ function KpiTile({
   thresholds?: [warn: number, crit: number];
   variant?: "default" | "compact";
 }) {
+  const compact = useCompact();
   let color = "#000000";
   let tileBg = "linear-gradient(135deg, #63A8A5 0%, #DA7C60 100%)";
   if (thresholds && value != null) {
@@ -2742,7 +2743,7 @@ function KpiTile({
     value != null && !isNaN(value)
       ? Number(value.toFixed(decimals))
       : null;
-  if (variant === "compact") {
+  if (variant === "compact" || compact) {
     return (
       <div className="flex min-w-0 flex-col gap-2 p-2">
         <div className="flex items-center gap-2">
