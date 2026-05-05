@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Calendar as CalendarIcon,
   Camera,
   ChevronDown,
   Clock,
@@ -29,6 +30,11 @@ import {
   WifiOff,
   Zap,
 } from "lucide-react";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
+
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { AgeGroupsSection } from "@/components/section/age-groups.section";
 import { HalfPieChartSection } from "@/components/section/half-pie-chart.section";
