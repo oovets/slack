@@ -1019,7 +1019,7 @@ function Inner({ host }: { host: string }) {
               onChange={setTimeRangeKey}
             />
             <span
-              className="eidra-sans inline-flex h-9 items-center gap-1.5 rounded-md border border-black/10 bg-[#F5F2ED] px-3 text-[12px] font-bold leading-none tracking-tight tabular-nums text-black/60"
+              className={cn(toolbarPillClass, "tabular-nums text-black/60")}
               aria-live="polite"
             >
               <span
