@@ -983,11 +983,15 @@ function Inner({ host }: { host: string }) {
   }, []);
 
   return (
+    <CompactContext.Provider value={compact}>
     <div
       ref={containerRef}
       className="fixed inset-0 z-0 w-full overflow-y-auto bg-[#fbfbf9]"
     >
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-10 py-10">
+      <div className={cn(
+        "mx-auto flex w-full max-w-[1400px] flex-col",
+        compact ? "gap-2 px-4 py-4" : "gap-5 px-10 py-10",
+      )}>
         {/* TOOLBAR — sticky so it remains reachable while scrolling long dashboards */}
         <div className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-2 rounded-xl border border-black/5 bg-[#fbfbf9]/85 px-4 py-2.5 shadow-[0_1px_0_rgba(0,0,0,0.04)] backdrop-blur-md supports-[backdrop-filter]:bg-[#fbfbf9]/70">
           <div className="relative">
