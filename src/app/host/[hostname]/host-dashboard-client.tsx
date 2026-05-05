@@ -1163,7 +1163,14 @@ function Inner({ host }: { host: string }) {
         ) : null}
 
         <Box id="block-visibility-metrics" title="Visibility" style={boxStyles}>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div
+            className={cn(
+              "grid",
+              compact
+                ? "grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7"
+                : "grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4",
+            )}
+          >
             {visibilityMetrics.map((metric) => (
               <VisualStatCard
                 key={metric.title}
