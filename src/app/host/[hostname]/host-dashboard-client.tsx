@@ -2264,7 +2264,7 @@ function AngleAward({
         )}
         style={{ textRendering: "geometricPrecision" }}
       >
-        {formatMetricNumber(camera?.[metric] ?? 0)}
+        <SlidingNumber animateOnLoad={false} number={camera?.[metric] ?? 0} decimalSeparator="," />
       </h1>
       {!compact ? (
         <p className="pp-neue-montreal mt-1 truncate text-[12px] font-medium text-black/50">
