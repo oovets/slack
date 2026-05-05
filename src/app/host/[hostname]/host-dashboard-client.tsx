@@ -1071,6 +1071,15 @@ function Inner({ host }: { host: string }) {
               {overview ? new Date(overview.sampled_at * 1000).toLocaleTimeString("en-GB") : "—"}
             </span>
             <button
+              onClick={() => setCompact((c) => !c)}
+              className={cn(toolbarControlClass, compact && "bg-black text-white hover:bg-black")}
+              title={compact ? "Switch to comfortable layout" : "Switch to compact overview"}
+              aria-pressed={compact}
+            >
+              {compact ? <LayoutGrid className="h-3.5 w-3.5" /> : <Rows3 className="h-3.5 w-3.5" />}
+              {compact ? "Comfort" : "Compact"}
+            </button>
+            <button
               onClick={() => setPaused((p) => !p)}
               className={toolbarControlClass}
               title={paused ? "Resume live updates" : "Pause live updates"}
