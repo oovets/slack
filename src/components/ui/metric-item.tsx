@@ -76,11 +76,7 @@ export function MetricItem({
           {name}
         </h2>
         <h1 
-          className={`eidra-sans flex items-baseline font-bold ${numberSizeClass} ml-[-2px]`}
-          // style={{ 
-          //   color: 'var(--text-color)',
-          //   fontWeight: 'var(--font-weight-bold)',
-          // }}
+          className={`eidra-sans flex items-baseline font-bold tabular-nums text-black ${numberSizeClass} ml-[-2px]`}
           style={{
             textRendering: 'geometricPrecision',
           }}
