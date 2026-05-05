@@ -1112,7 +1112,7 @@ function Inner({ host }: { host: string }) {
         {!isTagTarget ? (
           <CollapsibleBox
             id="block-cameras"
-            title="Cameras"
+            title=""
             style={boxStyles}
             defaultOpen={false}
           >
