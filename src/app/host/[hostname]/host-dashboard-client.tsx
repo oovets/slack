@@ -1125,16 +1125,15 @@ function Inner({ host }: { host: string }) {
         )}
 
         {/* HERO TITLE — typographic contrast: "Live metrics from" muted, target bold */}
-        <h1
-          id="dashboard-hero-title"
-          className={cn(
-            "eidra-sans text-center font-bold tracking-tight text-black",
-            compact ? "mt-0 text-[20px] leading-[24px]" : "mt-2 text-[60px] leading-[60px]",
-          )}
-          style={{ textRendering: "geometricPrecision" }}
-        >
-          {heroTitle.replace(targetLabel, "").trim()} {targetLabel}
-        </h1>
+        {!compact ? (
+          <h1
+            id="dashboard-hero-title"
+            className="eidra-sans mt-2 text-center font-bold tracking-tight text-black text-[60px] leading-[60px]"
+            style={{ textRendering: "geometricPrecision" }}
+          >
+            {heroTitle.replace(targetLabel, "").trim()} {targetLabel}
+          </h1>
+        ) : null}
 
         <Box id="block-nextm-metrics" style={boxStyles}>
           <MetricsSection metricItems={nextmMetrics} columns={4} />
@@ -1738,16 +1737,15 @@ function BleCsiTab({
 
   return (
     <>
-      <h1
-        id="dashboard-ble-csi-title"
-        className={cn(
-          "eidra-sans text-center font-bold tracking-tight text-black",
-          compact ? "mt-0 text-[20px] leading-[24px]" : "mt-2 text-[60px] leading-[60px]",
-        )}
-        style={{ textRendering: "geometricPrecision" }}
-      >
-        BLE / CSI from {data?.host ?? "host"}
-      </h1>
+      {!compact ? (
+        <h1
+          id="dashboard-ble-csi-title"
+          className="eidra-sans mt-2 text-center font-bold tracking-tight text-black text-[60px] leading-[60px]"
+          style={{ textRendering: "geometricPrecision" }}
+        >
+          BLE / CSI from {data?.host ?? "host"}
+        </h1>
+      ) : null}
 
       <Box id="block-ble-csi-kpis" style={boxStyles}>
         <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-black/60">
