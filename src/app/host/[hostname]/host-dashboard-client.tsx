@@ -1877,45 +1877,69 @@ function VisualStatCard({
     accent: "#DA7C60",
   }[tone];
   const pct = progress == null ? null : Math.max(0, Math.min(100, progress));
+  const compact = useCompact();
   return (
-    <div className="relative overflow-hidden rounded-md border border-black/5 bg-white px-5 py-5">
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-md border border-black/5 bg-white",
+        compact ? "px-3 py-2" : "px-5 py-5",
+      )}
+    >
       <span
         aria-hidden
         className="absolute left-0 top-0 h-full w-1"
         style={{ background: toneColor }}
       />
-      <div className="flex items-start justify-between gap-3">
-        <p className="eidra-sans text-[12px] font-bold uppercase tracking-[0.08em] text-black/55">
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className={cn(
+            "eidra-sans font-bold uppercase tracking-[0.08em] text-black/55",
+            compact ? "text-[10px]" : "text-[12px]",
+          )}
+        >
           {title}
         </p>
-        {icon ? (
+        {icon && !compact ? (
           <span className="text-black/35" aria-hidden>
             {icon}
           </span>
         ) : null}
       </div>
-      <div className="mt-2 flex items-baseline gap-2">
+      <div className={cn("flex items-baseline gap-2", compact ? "mt-0.5" : "mt-2")}>
         <p
-          className="eidra-sans text-[42px] font-bold leading-[44px] tabular-nums tracking-tight"
+          className={cn(
+            "eidra-sans font-bold tabular-nums tracking-tight",
+            compact ? "text-[20px] leading-[22px]" : "text-[42px] leading-[44px]",
+          )}
           style={{ color: toneColor, textRendering: "geometricPrecision" }}
         >
           {value}
         </p>
         {caption ? (
-          <span className="eidra-sans text-[13px] font-bold text-black/35 tabular-nums">
+          <span
+            className={cn(
+              "eidra-sans font-bold text-black/35 tabular-nums",
+              compact ? "text-[10px]" : "text-[13px]",
+            )}
+          >
             {caption}
           </span>
         ) : null}
       </div>
       {pct != null ? (
-        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
+        <div
+          className={cn(
+            "w-full overflow-hidden rounded-full bg-black/[0.06]",
+            compact ? "mt-1.5 h-1" : "mt-3 h-1.5",
+          )}
+        >
           <div
             className="h-full rounded-full transition-[width] duration-500 ease-out"
             style={{ width: `${pct}%`, background: toneColor }}
           />
         </div>
       ) : null}
-      {detail ? (
+      {detail && !compact ? (
         <p className="pp-neue-montreal mt-3 text-xs font-medium text-black/45">{detail}</p>
       ) : null}
     </div>
