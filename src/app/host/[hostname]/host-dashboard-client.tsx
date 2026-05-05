@@ -1600,22 +1600,24 @@ function CollapsibleBox({
         aria-expanded={open}
         aria-controls={`${id}-content`}
       >
-        <div>
-          <h3
-            id={`${id}-title`}
-            className="eidra-sans text-[36px] font-bold leading-[14px] tracking-tight text-black"
-            style={{ textRendering: "geometricPrecision" }}
-          >
-            {title}
-          </h3>
-          <span
-            aria-hidden
-            className={cn(
-              "mt-[18px] block h-[2px] rounded-full bg-black/80 transition-all duration-300",
-              open ? "w-[44px]" : "w-[20px] bg-black/40 group-hover:w-[44px] group-hover:bg-black/80",
-            )}
-          />
-        </div>
+        {title ? (
+          <div>
+            <h3
+              id={`${id}-title`}
+              className="eidra-sans text-[36px] font-bold leading-[14px] tracking-tight text-black"
+              style={{ textRendering: "geometricPrecision" }}
+            >
+              {title}
+            </h3>
+            <span
+              aria-hidden
+              className={cn(
+                "mt-[18px] block h-[2px] rounded-full bg-black/80 transition-all duration-300",
+                open ? "w-[44px]" : "w-[20px] bg-black/40 group-hover:w-[44px] group-hover:bg-black/80",
+              )}
+            />
+          </div>
+        ) : <span />}
         <span className="ml-4 inline-flex h-9 w-9 items-center justify-center rounded-md border border-black/10 text-black transition-colors hover:bg-black/5">
           <ChevronDown
             className={cn("h-5 w-5 transition-transform duration-300", open && "rotate-180")}
