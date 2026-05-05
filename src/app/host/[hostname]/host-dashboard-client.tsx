@@ -394,6 +394,22 @@ const IGNORED_TARGET_TAGS = new Set([
   "tag:aicam",
   "tag:rpi",
 ]);
+const ASPACE_PROD_HOST_RE = /^aspace-prod-(\d+)$/;
+
+function compareAspaceHosts(a: string, b: string) {
+  const aMatch = ASPACE_PROD_HOST_RE.exec(a);
+  const bMatch = ASPACE_PROD_HOST_RE.exec(b);
+  if (aMatch && bMatch) {
+    const aNum = Number(aMatch[1]);
+    const bNum = Number(bMatch[1]);
+    if (aNum !== bNum) return aNum - bNum;
+  }
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+function isDashboardHost(device: { hostname: string; tags?: string[] }) {
+  return ASPACE_PROD_HOST_RE.test(device.hostname) || (device.tags || []).includes("tag:jetson");
+}
 
 const boxStyles = {
   backgroundColor: "#FFFFFF",
@@ -534,12 +550,19 @@ function Inner({ host }: { host: string }) {
   });
 
   const selectableHosts = useMemo(() => {
-    const online = new Set(
-      (tailscaleDevices?.hosts || [])
-        .filter((h) => h.online)
-        .map((h) => h.hostname),
-    );
-    let filtered = HOSTS.filter((h) => online.has(h));
+    const onlineHosts = (tailscaleDevices?.hosts || [])
+      .filter((h) => h.online && isDashboardHost(h))
+      .map((h) => h.hostname)
+      .sort(compareAspaceHosts);
+    let filtered = Array.from(new Set(onlineHosts));
+    if (filtered.length === 0) {
+      const online = new Set(
+        (tailscaleDevices?.hosts || [])
+          .filter((h) => h.online)
+          .map((h) => h.hostname),
+      );
+      filtered = HOSTS.filter((h) => online.has(h));
+    }
     if (filtered.length === 0) filtered = [...HOSTS];
     if (!isTagTarget && !filtered.includes(host)) filtered = [host, ...filtered];
     return filtered;
