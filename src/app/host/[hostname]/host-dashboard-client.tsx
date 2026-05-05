@@ -214,7 +214,7 @@ interface AnalyticsSummary {
   cached_age_sec?: number;
 }
 /** Calendar-aware time range used by the analytics queries. */
-type TimeRangeKey = "today" | "yesterday" | "7d" | "1h";
+type TimeRangeKey = "today" | "yesterday" | "7d" | "1h" | "custom";
 interface TimeRange {
   key: TimeRangeKey;
   label: string;
@@ -226,7 +226,7 @@ interface TimeRange {
 
 /** Build the four supported ranges anchored to Europe/Stockholm local time so
  *  that "today" / "yesterday" line up with the user's calendar — not UTC. */
-function buildTimeRanges(): Record<TimeRangeKey, TimeRange> {
+function buildTimeRanges(): Record<Exclude<TimeRangeKey, "custom">, TimeRange> {
   const now = new Date();
   // Local midnight of "today" in the browser's timezone.
   const todayStart = new Date(now);
