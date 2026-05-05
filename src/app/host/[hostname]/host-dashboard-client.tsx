@@ -1735,16 +1735,6 @@ function BleCsiTab({
 
   return (
     <>
-      {!compact ? (
-        <h1
-          id="dashboard-ble-csi-title"
-          className="eidra-sans mt-2 text-center font-bold tracking-tight text-black text-[60px] leading-[60px]"
-          style={{ textRendering: "geometricPrecision" }}
-        >
-          BLE / CSI from {data?.host ?? "host"}
-        </h1>
-      ) : null}
-
       <Box id="block-ble-csi-kpis" style={boxStyles}>
         <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-black/60">
           <span>
