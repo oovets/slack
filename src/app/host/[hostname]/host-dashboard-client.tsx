@@ -1506,6 +1506,7 @@ function Inner({ host }: { host: string }) {
         <Footer src="/eidra-logo.svg" />
       </div>
     </div>
+    </CompactContext.Provider>
   );
 }
 
