@@ -1570,7 +1570,7 @@ function Pill({
   }[tone];
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-[#F5F2ED] px-3 py-1 text-xs font-medium text-black"
+      className="inline-flex h-9 items-center gap-1.5 rounded-md border border-black/10 bg-[#F5F2ED] px-3 text-[13px] font-medium leading-none text-black"
       title={label}
     >
       <span
