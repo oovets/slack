@@ -1133,6 +1133,16 @@ function Inner({ host }: { host: string }) {
           <MetricsSection metricItems={nextmMetrics} columns={4} />
         </Box>
 
+        {/* AGGREGATE GENDER + AGE — promoted directly under KPI cards */}
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <Box id="block-gender" title="Contacts by gender" style={boxStyles}>
+            <HalfPieChartSection contactsByGender={totals.contactsByGender} />
+          </Box>
+          <Box id="block-age" title="Age groups" style={boxStyles}>
+            <AgeGroupsSection ageGroups={ageGroups} />
+          </Box>
+        </div>
+
         {/* NEXTM ANALYTICS — remaining calculations.ts-derived values */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Box id="block-rac-over-time" title="RAC over time" style={boxStyles}>
