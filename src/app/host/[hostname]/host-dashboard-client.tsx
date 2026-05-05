@@ -2113,9 +2113,9 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
                 </span>
               </div>
               <div className={cn("grid grid-cols-3", compact ? "gap-3" : "gap-6")}>
-                <CameraBar label="Detections" value={camera.total_detections} max={maxCamDetections} />
-                <CameraBar label="RAC" value={camera.rac} max={maxCamRac} />
-                <CameraBar label="Unique" value={camera.unique_persons} max={maxCamUnique} />
+                <CameraBar label="Detections" value={camera.total_detections} max={maxCamDetections} color="#316a53" />
+                <CameraBar label="RAC" value={camera.rac} max={maxCamRac} color="#DA7C60" />
+                <CameraBar label="Unique" value={camera.unique_persons} max={maxCamUnique} color="#63A8A5" />
               </div>
             </div>
           ))}
@@ -2198,10 +2198,12 @@ function CameraBar({
   label,
   value,
   max,
+  color = "#316a53",
 }: {
   label: string;
   value: number;
   max: number;
+  color?: string;
 }) {
   const compact = useCompact();
   const pct = max > 0 ? Math.max(2, Math.min(100, (value / max) * 100)) : 0;
@@ -2218,18 +2220,18 @@ function CameraBar({
         </span>
         <span
           className={cn(
-            "eidra-sans font-bold tabular-nums tracking-tight text-black",
+            "eidra-sans font-bold tabular-nums tracking-tight",
             compact ? "text-[15px]" : "text-[22px]",
           )}
-          style={{ textRendering: "geometricPrecision" }}
+          style={{ textRendering: "geometricPrecision", color }}
         >
           <SlidingNumber animateOnLoad={false} number={value} decimalSeparator="," />
         </span>
       </div>
       <div className={cn("mt-1 w-full overflow-hidden rounded-full bg-black/[0.06]", compact ? "h-1" : "h-1.5")}>
         <div
-          className="h-full rounded-full bg-black transition-[width] duration-500 ease-out"
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%`, background: color }}
         />
       </div>
     </div>
