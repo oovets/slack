@@ -2961,18 +2961,23 @@ function TimeRangePicker({
   ranges,
   activeKey,
   onChange,
+  customRange,
+  onCustomRangeChange,
+  customLabel,
 }: {
-  ranges: Record<TimeRangeKey, TimeRange>;
+  ranges: Record<Exclude<TimeRangeKey, "custom">, TimeRange>;
   activeKey: TimeRangeKey;
   onChange: (key: TimeRangeKey) => void;
+  customRange?: DateRange;
+  onCustomRangeChange?: (range: DateRange | undefined) => void;
+  customLabel?: string;
 }) {
-  const order: TimeRangeKey[] = ["1h", "today", "yesterday", "7d"];
-  const activeRange = ranges[activeKey];
+  const order: Exclude<TimeRangeKey, "custom">[] = ["1h", "today", "yesterday", "7d"];
+  const customActive = activeKey === "custom";
   return (
     <div
       role="group"
       aria-label="Time range"
-      title={describeRange(activeRange)}
       className={toolbarSegmentClass}
     >
       {order.map((k) => {
@@ -2995,6 +3000,35 @@ function TimeRangePicker({
           </button>
         );
       })}
+      {onCustomRangeChange ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              title="Pick a custom date range"
+              className={cn(
+                toolbarSegmentButtonClass,
+                "gap-1.5 border-l border-black/10",
+                customActive
+                  ? "bg-black text-white"
+                  : "text-black/70 hover:bg-black/5",
+              )}
+            >
+              <CalendarIcon className="h-3.5 w-3.5" />
+              {customActive && customLabel ? customLabel : "Custom"}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="range"
+              selected={customRange}
+              onSelect={onCustomRangeChange}
+              numberOfMonths={2}
+              defaultMonth={customRange?.from ?? new Date()}
+            />
+          </PopoverContent>
+        </Popover>
+      ) : null}
     </div>
   );
 }
