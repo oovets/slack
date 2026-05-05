@@ -1600,7 +1600,10 @@ function CollapsibleBox({
       <button
         type="button"
         onClick={toggle}
-        className="group flex w-full items-center justify-between text-left"
+        className={cn(
+          "group flex items-center text-left",
+          title ? "w-full justify-between" : "w-auto",
+        )}
         aria-expanded={open}
         aria-controls={`${id}-content`}
       >
@@ -1621,8 +1624,8 @@ function CollapsibleBox({
               )}
             />
           </div>
-        ) : <span />}
-        <span className="ml-4 inline-flex h-9 w-9 items-center justify-center rounded-md border border-black/10 text-black transition-colors hover:bg-black/5">
+        ) : null}
+        <span className={cn("inline-flex h-9 w-9 items-center justify-center rounded-md border border-black/10 text-black transition-colors hover:bg-black/5", title && "ml-4")}>
           <ChevronDown
             className={cn("h-5 w-5 transition-transform duration-300", open && "rotate-180")}
           />
