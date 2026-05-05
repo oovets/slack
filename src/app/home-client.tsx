@@ -285,10 +285,11 @@ function HomeContent({ campaignId, isAdmin }: { campaignId: string; isAdmin: boo
             />
             <h1
               id="dashboard-header-title"
-              className="eidra-sans pointer-events-auto absolute left-1/2 top-1/2 w-full max-w-[min(100%,1600px)] -translate-x-1/2 -translate-y-1/2 text-center text-[60px] font-bold leading-[60px] text-black"
+              className="eidra-sans pointer-events-auto absolute left-1/2 top-1/2 w-full max-w-[min(100%,1600px)] -translate-x-1/2 -translate-y-1/2 text-center text-[52px] leading-[60px] text-black"
               style={{ textRendering: "geometricPrecision" }}
             >
-              Live metrics from {campaignTitle}
+              <span className="font-medium text-black/60">Live metrics from </span>
+              <span className="font-bold">{campaignTitle}</span>
             </h1>
             <div className="absolute right-0 top-1/2 z-10 flex -translate-y-1/2 items-center">
               {/* Campaign logo URLs are dynamic — next/image remotePatterns would be noisy */}
