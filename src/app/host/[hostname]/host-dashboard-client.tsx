@@ -697,6 +697,11 @@ function Inner({ host }: { host: string }) {
   // Sparkline histories — both host-scoped, reset on host change.
   const [writesHistory, setWritesHistory] = useState<number[]>([]);
   const [analyticsRateHistory, setAnalyticsRateHistory] = useState<number[]>([]);
+  const analyticsLastMinute =
+    mongo?.host_collections.find((c) => c.name === "analytics")?.last_60s ?? null;
+  const analyticsHistoryAverage = analyticsRateHistory.length
+    ? analyticsRateHistory.reduce((a, b) => a + b, 0) / analyticsRateHistory.length
+    : null;
   useEffect(() => {
     setWritesHistory([]);
     setAnalyticsRateHistory([]);
@@ -1156,6 +1161,50 @@ function Inner({ host }: { host: string }) {
           <MetricsSection metricItems={nextmMetrics} columns={4} />
         </Box>
 
+        {!isTagTarget ? (
+          <Box id="block-live-operational-kpis" style={boxStyles}>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-3 md:grid-cols-3 xl:grid-cols-6">
+              <KpiTile
+                icon={<Database className="h-9 w-9 text-white" />}
+                label="Inserts / sec"
+                value={hostInsertsPerSec}
+                decimals={2}
+              />
+              <KpiTile
+                icon={<Database className="h-9 w-9 text-white" />}
+                label="Inserts / min"
+                value={hostInsertsPerMin}
+                decimals={0}
+              />
+              <KpiTile
+                icon={<Activity className="h-9 w-9 text-white" />}
+                label="Last minute"
+                value={analyticsLastMinute}
+                postfix=" /min"
+              />
+              <KpiTile
+                icon={<Activity className="h-9 w-9 text-white" />}
+                label="History average"
+                value={analyticsHistoryAverage}
+                decimals={1}
+                postfix=" /min"
+              />
+              <KpiTile
+                icon={<ArrowDown className="h-9 w-9 text-white" />}
+                label="RX Mbps"
+                value={network?.rx_mbps ?? null}
+                decimals={2}
+              />
+              <KpiTile
+                icon={<ArrowUp className="h-9 w-9 text-white" />}
+                label="TX Mbps"
+                value={network?.tx_mbps ?? null}
+                decimals={2}
+              />
+            </div>
+          </Box>
+        ) : null}
+
         {/* AGGREGATE GENDER + AGE — promoted directly under KPI cards */}
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Box id="block-gender" title="Contacts by gender" style={boxStyles}>
@@ -1271,23 +1320,7 @@ function Inner({ host }: { host: string }) {
 
         {/* NETWORK — current rx/tx + 30 min sparkline */}
         <Box id="block-network" title="Network" style={boxStyles}>
-          <div className="grid grid-cols-2 gap-x-2 gap-y-3 xl:grid-cols-[auto_auto_minmax(0,1fr)]">
-            <KpiTile
-              icon={<ArrowDown className="h-9 w-9 text-white" />}
-              label="RX Mbps"
-              value={network?.rx_mbps ?? null}
-              decimals={2}
-            />
-            <KpiTile
-              icon={<ArrowUp className="h-9 w-9 text-white" />}
-              label="TX Mbps"
-              value={network?.tx_mbps ?? null}
-              decimals={2}
-            />
-            <div className="col-span-2 min-w-0 xl:col-span-1">
-              <NetworkSparklines network={network} />
-            </div>
-          </div>
+          <NetworkSparklines network={network} />
         </Box>
 
         {/* ACTIVE ALARMS — between System and Cameras */}
@@ -1367,22 +1400,8 @@ function Inner({ host }: { host: string }) {
 
         {/* MONGODB WRITES — host-scoped */}
         <Box id="block-mongo" title="MongoDB writes" style={boxStyles}>
-          <div className="grid grid-cols-1 gap-x-2 gap-y-3 md:grid-cols-2">
-            <KpiTile
-              icon={<Database className="h-9 w-9 text-white" />}
-              label="Inserts / sec"
-              value={hostInsertsPerSec}
-              decimals={2}
-            />
-            <KpiTile
-              icon={<Database className="h-9 w-9 text-white" />}
-              label="Inserts / min"
-              value={hostInsertsPerMin}
-              decimals={0}
-            />
-          </div>
           {writesHistory.length >= 2 && (
-            <div className="mt-4 rounded-md border border-black/5 bg-white px-3 py-3">
+            <div className="rounded-md border border-black/5 bg-white px-3 py-3">
               <Sparkline data={writesHistory} stroke="#316a53" />
             </div>
           )}
@@ -1444,29 +1463,8 @@ function Inner({ host }: { host: string }) {
 
         {/* LATEST ANALYTICS */}
         <Box id="block-latest-analytics" title="Latest analytics" style={boxStyles}>
-          <div className="grid grid-cols-1 gap-x-2 gap-y-3 md:grid-cols-2">
-            <KpiTile
-              icon={<Activity className="h-9 w-9 text-white" />}
-              label="Last minute"
-              value={
-                mongo?.host_collections.find((c) => c.name === "analytics")?.last_60s ?? null
-              }
-              postfix=" /min"
-            />
-            <KpiTile
-              icon={<Activity className="h-9 w-9 text-white" />}
-              label="History average"
-              value={
-                analyticsRateHistory.length
-                  ? analyticsRateHistory.reduce((a, b) => a + b, 0) / analyticsRateHistory.length
-                  : null
-              }
-              decimals={1}
-              postfix=" /min"
-            />
-          </div>
           {analyticsRateHistory.length >= 2 && (
-            <div className="mt-4 rounded-md border border-black/5 bg-white px-3 py-3">
+            <div className="rounded-md border border-black/5 bg-white px-3 py-3">
               <Sparkline data={analyticsRateHistory} stroke="#316a53" />
             </div>
           )}
