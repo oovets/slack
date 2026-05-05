@@ -13,10 +13,19 @@ export const metadata: Metadata = {
 
 export default async function HostPage({ params }: HostPageProps) {
   const { hostname } = await params;
+  const decodedHostname = decodeHostParam(hostname);
 
-  if (!hostname || !/^(aspace-prod-\d+|tag:[a-z0-9_-]+)$/.test(hostname)) {
+  if (!decodedHostname || !/^(aspace-prod-\d+|tag:[a-z0-9_-]+)$/.test(decodedHostname)) {
     notFound();
   }
 
-  return <HostDashboardClient host={hostname} />;
+  return <HostDashboardClient host={decodedHostname} />;
+}
+
+function decodeHostParam(hostname: string) {
+  try {
+    return decodeURIComponent(hostname);
+  } catch {
+    return "";
+  }
 }
