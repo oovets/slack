@@ -2198,10 +2198,12 @@ function CameraBar({
   label,
   value,
   max,
+  color = "#316a53",
 }: {
   label: string;
   value: number;
   max: number;
+  color?: string;
 }) {
   const compact = useCompact();
   const pct = max > 0 ? Math.max(2, Math.min(100, (value / max) * 100)) : 0;
@@ -2218,18 +2220,18 @@ function CameraBar({
         </span>
         <span
           className={cn(
-            "eidra-sans font-bold tabular-nums tracking-tight text-black",
+            "eidra-sans font-bold tabular-nums tracking-tight",
             compact ? "text-[15px]" : "text-[22px]",
           )}
-          style={{ textRendering: "geometricPrecision" }}
+          style={{ textRendering: "geometricPrecision", color }}
         >
           <SlidingNumber animateOnLoad={false} number={value} decimalSeparator="," />
         </span>
       </div>
       <div className={cn("mt-1 w-full overflow-hidden rounded-full bg-black/[0.06]", compact ? "h-1" : "h-1.5")}>
         <div
-          className="h-full rounded-full bg-black transition-[width] duration-500 ease-out"
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%`, background: color }}
         />
       </div>
     </div>
