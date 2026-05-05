@@ -1593,7 +1593,7 @@ function Pill({
   }[tone];
   return (
     <span
-      className="eidra-sans inline-flex h-9 items-center gap-1.5 rounded-md border border-black/10 bg-[#F5F2ED] px-3 text-[13px] font-bold leading-none tracking-tight text-black"
+      className={toolbarPillClass}
       title={label}
     >
       <span
