@@ -1183,7 +1183,9 @@ function Inner({ host }: { host: string }) {
               <VisualStatCard
                 key={metric.title}
                 title={metric.title}
-                value={metric.value}
+                number={metric.number}
+                postfix={metric.postfix}
+                decimals={metric.decimals}
                 detail={metric.detail}
                 caption={metric.caption}
               />
