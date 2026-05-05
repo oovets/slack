@@ -1905,7 +1905,17 @@ function VisualStatCard({
         )}
         style={{ textRendering: "geometricPrecision" }}
       >
-        {value}
+        {displayValue == null ? (
+          <span className="text-black/30">—</span>
+        ) : (
+          <SlidingNumber
+            animateOnLoad={false}
+            decimalPlaces={decimals}
+            number={displayValue}
+            decimalSeparator=","
+            postfix={postfix}
+          />
+        )}
         {caption ? (
           <span
             className={cn(
