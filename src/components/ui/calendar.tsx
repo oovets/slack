@@ -22,29 +22,29 @@ function Calendar({
         months: "flex flex-col sm:flex-row gap-4",
         month: "flex flex-col gap-3",
         month_caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "eidra-sans text-sm font-bold tracking-tight",
+        caption_label: "eidra-sans text-[13px] font-bold tracking-tight leading-none",
         nav: "flex items-center gap-1 absolute right-1 top-1",
         button_previous: cn(
-          "h-7 w-7 inline-flex items-center justify-center rounded-md border border-black/10 bg-[#F5F2ED] text-black hover:bg-black/5 transition",
+          "h-7 w-7 inline-flex items-center justify-center rounded-md border border-black/10 bg-[#F5F2ED] text-black transition hover:bg-black/5",
         ),
         button_next: cn(
-          "h-7 w-7 inline-flex items-center justify-center rounded-md border border-black/10 bg-[#F5F2ED] text-black hover:bg-black/5 transition",
+          "h-7 w-7 inline-flex items-center justify-center rounded-md border border-black/10 bg-[#F5F2ED] text-black transition hover:bg-black/5",
         ),
         month_grid: "w-full border-collapse",
         weekdays: "flex",
         weekday:
-          "text-black/50 eidra-sans w-9 text-[11px] font-medium uppercase tracking-wide",
+          "text-black/50 eidra-sans w-9 text-[11px] font-bold uppercase tracking-tight",
         week: "flex w-full mt-1",
-        day: "relative h-9 w-9 p-0 text-center text-[13px] eidra-sans",
+        day: "relative h-9 w-9 p-0 text-center eidra-sans text-[13px] font-bold tracking-tight leading-none",
         day_button: cn(
-          "h-9 w-9 inline-flex items-center justify-center rounded-md font-medium tracking-tight",
-          "hover:bg-black/5 transition-colors",
+          "h-9 w-9 inline-flex items-center justify-center rounded-md font-bold tracking-tight text-black/70 transition",
+          "hover:bg-black/5",
         ),
         range_start:
           "[&>button]:bg-black [&>button]:text-white [&>button]:hover:bg-black",
         range_end:
           "[&>button]:bg-black [&>button]:text-white [&>button]:hover:bg-black",
-        range_middle: "[&>button]:bg-black/10 [&>button]:text-black",
+        range_middle: "[&>button]:bg-black/10 [&>button]:text-black [&>button]:hover:bg-black/10",
         selected:
           "[&>button]:bg-black [&>button]:text-white [&>button]:hover:bg-black",
         today: "[&>button]:underline underline-offset-4",
