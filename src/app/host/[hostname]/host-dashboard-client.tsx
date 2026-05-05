@@ -2205,25 +2205,41 @@ function AngleAward({
     bad: "#ef4444",
     accent: "#DA7C60",
   }[tone];
+  const compact = useCompact();
   return (
-    <div className="relative overflow-hidden rounded-md border border-black/5 bg-white px-5 py-5">
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-md border border-black/5 bg-white",
+        compact ? "px-3 py-2" : "px-5 py-5",
+      )}
+    >
       <span
         aria-hidden
         className="absolute left-0 top-0 h-full w-1"
         style={{ background: toneColor }}
       />
-      <p className="eidra-sans text-[12px] font-bold uppercase tracking-[0.08em] text-black/55">
+      <p
+        className={cn(
+          "eidra-sans font-bold uppercase tracking-[0.08em] text-black/55",
+          compact ? "text-[10px]" : "text-[12px]",
+        )}
+      >
         Best {label}
       </p>
       <p
-        className="eidra-sans mt-2 text-[42px] font-bold leading-[44px] tabular-nums tracking-tight"
+        className={cn(
+          "eidra-sans font-bold tabular-nums tracking-tight",
+          compact ? "mt-0.5 text-[20px] leading-[22px]" : "mt-2 text-[42px] leading-[44px]",
+        )}
         style={{ color: toneColor, textRendering: "geometricPrecision" }}
       >
         {formatMetricNumber(camera?.[metric] ?? 0)}
       </p>
-      <p className="pp-neue-montreal mt-2 truncate font-mono text-xs font-medium text-black/45">
-        {camera?.camera_id ?? "—"}
-      </p>
+      {!compact ? (
+        <p className="pp-neue-montreal mt-2 truncate font-mono text-xs font-medium text-black/45">
+          {camera?.camera_id ?? "—"}
+        </p>
+      ) : null}
     </div>
   );
 }
