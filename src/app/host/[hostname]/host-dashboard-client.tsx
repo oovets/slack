@@ -908,33 +908,41 @@ function Inner({ host }: { host: string }) {
     return [
       {
         title: "Looked at screen",
-        value: `${formatMetricNumber(totals.lookedAtScreenPct, 1)}%`,
+        number: totals.lookedAtScreenPct,
+        postfix: "%",
+        decimals: 1,
         detail: "Unique contacts / aggregated audience",
         progress: totals.lookedAtScreenPct,
         tone: "positive" as const,
       },
       {
         title: "Looked away",
-        value: `${formatMetricNumber(totals.lookedAwayPct, 1)}%`,
+        number: totals.lookedAwayPct,
+        postfix: "%",
+        decimals: 1,
         detail: "Audience not converted into contacts",
         progress: totals.lookedAwayPct,
         tone: "warn" as const,
       },
       {
         title: "Avg spent in zone",
-        value: `${formatMetricNumber(totals.avgSpentInZone, 1)}s`,
+        number: totals.avgSpentInZone,
+        postfix: "s",
+        decimals: 1,
         detail: "Total observation time / unique contacts",
         tone: "neutral" as const,
       },
       {
         title: "Total observation time",
-        value: `${formatMetricNumber(totals.totalObservationMinutes, 1)}m`,
+        number: totals.totalObservationMinutes,
+        postfix: "m",
+        decimals: 1,
         detail: "All looking-at-screen observations",
         tone: "accent" as const,
       },
       {
         title: "Total unique contacts",
-        value: formatMetricNumber(totals.unique),
+        number: totals.unique,
         caption: totalHumans ? `/ ${formatMetricNumber(totalHumans)}` : undefined,
         detail: "Deduped people with camera attention",
         progress: pctOf(totals.unique),
@@ -942,13 +950,13 @@ function Inner({ host }: { host: string }) {
       },
       {
         title: "Total humans",
-        value: formatMetricNumber(totals.detections),
+        number: totals.detections,
         detail: "All analytics records in the window",
         tone: "neutral" as const,
       },
       {
         title: "Not reached",
-        value: formatMetricNumber(totals.notReached),
+        number: totals.notReached,
         caption: totalHumans ? `/ ${formatMetricNumber(totalHumans)}` : undefined,
         detail: "Total humans minus unique contacts",
         progress: pctOf(totals.notReached),
@@ -1175,7 +1183,9 @@ function Inner({ host }: { host: string }) {
               <VisualStatCard
                 key={metric.title}
                 title={metric.title}
-                value={metric.value}
+                number={metric.number}
+                postfix={metric.postfix}
+                decimals={metric.decimals}
                 detail={metric.detail}
                 caption={metric.caption}
               />
@@ -1866,12 +1876,16 @@ function InsightCard({
  */
 function VisualStatCard({
   title,
-  value,
+  number,
+  postfix,
+  decimals = 0,
   detail,
   caption,
 }: {
   title: string;
-  value: string;
+  number: number | null | undefined;
+  postfix?: string;
+  decimals?: number;
   detail?: string;
   /** Optional secondary number displayed inline (e.g. peer total). */
   caption?: string;
@@ -1880,6 +1894,8 @@ function VisualStatCard({
   tone?: "neutral" | "positive" | "warn" | "bad" | "accent";
   icon?: React.ReactNode;
 }) {
+  const displayValue =
+    number != null && !isNaN(number) ? Number(number.toFixed(decimals)) : null;
   const compact = useCompact();
   return (
     <div className={cn("flex flex-col", compact ? "p-2" : "p-2")}>
@@ -1899,7 +1915,17 @@ function VisualStatCard({
         )}
         style={{ textRendering: "geometricPrecision" }}
       >
-        {value}
+        {displayValue == null ? (
+          <span className="text-black/30">—</span>
+        ) : (
+          <SlidingNumber
+            animateOnLoad={false}
+            decimalPlaces={decimals}
+            number={displayValue}
+            decimalSeparator=","
+            postfix={postfix}
+          />
+        )}
         {caption ? (
           <span
             className={cn(
@@ -2032,23 +2058,29 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
       >
         <VisualStatCard
           title="Audience confidence"
-          value={`${formatMetricNumber(confidence, 1)}%`}
+          number={confidence}
+          postfix="%"
+          decimals={1}
           detail="Overlap, detection balance, RAC balance"
         />
         <VisualStatCard
           title="Angle agreement"
-          value={`${formatMetricNumber(angleAgreement, 1)}%`}
+          number={angleAgreement}
+          postfix="%"
+          decimals={1}
           detail={`${formatMetricNumber(insight.confirmed_by_multiple_angles ?? 0)} confirmed by multiple angles`}
         />
         <VisualStatCard
           title="Double-count prevented"
-          value={formatMetricNumber(insight.double_count_prevented ?? 0)}
+          number={insight.double_count_prevented ?? 0}
           caption={rawSum ? `/ ${formatMetricNumber(rawSum)}` : undefined}
           detail="Raw camera contacts deduplicated"
         />
         <VisualStatCard
           title="Synced activity"
-          value={`${formatMetricNumber(synced, 1)}%`}
+          number={synced}
+          postfix="%"
+          decimals={1}
           detail={`${formatMetricNumber(insight.synced_bucket_count ?? 0)} / ${formatMetricNumber(insight.active_bucket_count ?? 0)} active buckets`}
         />
       </div>
@@ -2191,7 +2223,7 @@ function CameraBar({
           )}
           style={{ textRendering: "geometricPrecision" }}
         >
-          {formatMetricNumber(value)}
+          <SlidingNumber animateOnLoad={false} number={value} decimalSeparator="," />
         </span>
       </div>
       <div className={cn("mt-1 w-full overflow-hidden rounded-full bg-black/[0.06]", compact ? "h-1" : "h-1.5")}>
@@ -2232,7 +2264,7 @@ function AngleAward({
         )}
         style={{ textRendering: "geometricPrecision" }}
       >
-        {formatMetricNumber(camera?.[metric] ?? 0)}
+        <SlidingNumber animateOnLoad={false} number={camera?.[metric] ?? 0} decimalSeparator="," />
       </h1>
       {!compact ? (
         <p className="pp-neue-montreal mt-1 truncate text-[12px] font-medium text-black/50">
