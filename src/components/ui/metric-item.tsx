@@ -83,7 +83,7 @@ export function MetricItem({
           {name}
         </h2>
         <h1 
-          className={`flex items-baseline font-bold text-[57px] leading-[60px] ml-[-4px] ${
+          className={`flex items-baseline font-bold ${numberSizeClass} ml-[-4px] ${
             layout === "portrait" ? "pp-neue-montreal" : "eidra-sans"
           }`}
           // style={{ 
