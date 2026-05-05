@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Calendar as CalendarIcon,
   Camera,
   ChevronDown,
   Clock,
@@ -29,6 +30,11 @@ import {
   WifiOff,
   Zap,
 } from "lucide-react";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
+
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { AgeGroupsSection } from "@/components/section/age-groups.section";
 import { HalfPieChartSection } from "@/components/section/half-pie-chart.section";
@@ -208,7 +214,7 @@ interface AnalyticsSummary {
   cached_age_sec?: number;
 }
 /** Calendar-aware time range used by the analytics queries. */
-type TimeRangeKey = "today" | "yesterday" | "7d" | "1h";
+type TimeRangeKey = "today" | "yesterday" | "7d" | "1h" | "custom";
 interface TimeRange {
   key: TimeRangeKey;
   label: string;
@@ -220,7 +226,7 @@ interface TimeRange {
 
 /** Build the four supported ranges anchored to Europe/Stockholm local time so
  *  that "today" / "yesterday" line up with the user's calendar — not UTC. */
-function buildTimeRanges(): Record<TimeRangeKey, TimeRange> {
+function buildTimeRanges(): Record<Exclude<TimeRangeKey, "custom">, TimeRange> {
   const now = new Date();
   // Local midnight of "today" in the browser's timezone.
   const todayStart = new Date(now);
@@ -451,6 +457,7 @@ function Inner({ host }: { host: string }) {
     window.localStorage.setItem("host-dashboard-compact", compact ? "1" : "0");
   }, [compact]);
   const [timeRangeKey, setTimeRangeKey] = useState<TimeRangeKey>("today");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>("vision");
   const [uptimeWindow, setUptimeWindow] = useState<UptimeWindow>("24h");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -474,13 +481,35 @@ function Inner({ host }: { host: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rangeTick],
   );
-  const timeRange = timeRanges[timeRangeKey];
+  const timeRange: TimeRange = useMemo(() => {
+    if (timeRangeKey === "custom" && customRange?.from) {
+      const fromDate = new Date(customRange.from);
+      fromDate.setHours(0, 0, 0, 0);
+      const toBase = customRange.to ? new Date(customRange.to) : new Date(customRange.from);
+      const toDate = new Date(toBase);
+      toDate.setHours(0, 0, 0, 0);
+      toDate.setDate(toDate.getDate() + 1);
+      const fmt = (d: Date) => format(d, "MMM d");
+      const label =
+        customRange.to && customRange.from.getTime() !== customRange.to.getTime()
+          ? `${fmt(customRange.from)} – ${fmt(customRange.to)}`
+          : fmt(customRange.from);
+      return {
+        key: "custom",
+        label,
+        start: Math.floor(fromDate.getTime() / 1000),
+        end: Math.floor(toDate.getTime() / 1000),
+      };
+    }
+    return timeRanges[timeRangeKey === "custom" ? "today" : timeRangeKey];
+  }, [timeRangeKey, customRange, timeRanges]);
   const heroTitle = useMemo(() => {
     if (timeRangeKey === "yesterday") return `Yesterday metrics from ${targetLabel}`;
     if (timeRangeKey === "7d") return `Last week metrics from ${targetLabel}`;
     if (timeRangeKey === "today") return `Today metrics from ${targetLabel}`;
+    if (timeRangeKey === "custom") return `${timeRange.label} metrics from ${targetLabel}`;
     return `Live metrics from ${targetLabel}`;
-  }, [timeRangeKey, targetLabel]);
+  }, [timeRangeKey, targetLabel, timeRange.label]);
 
   // MJPEG cache-bust tick
   useEffect(() => {
@@ -1062,7 +1091,16 @@ function Inner({ host }: { host: string }) {
             <TimeRangePicker
               ranges={timeRanges}
               activeKey={timeRangeKey}
-              onChange={setTimeRangeKey}
+              onChange={(k) => {
+                setTimeRangeKey(k);
+                if (k !== "custom") setCustomRange(undefined);
+              }}
+              customRange={customRange}
+              onCustomRangeChange={(r) => {
+                setCustomRange(r);
+                if (r?.from) setTimeRangeKey("custom");
+              }}
+              customLabel={timeRangeKey === "custom" ? timeRange.label : undefined}
             />
             <span
               className={cn(toolbarPillClass, "tabular-nums text-black/60")}
@@ -2923,18 +2961,23 @@ function TimeRangePicker({
   ranges,
   activeKey,
   onChange,
+  customRange,
+  onCustomRangeChange,
+  customLabel,
 }: {
-  ranges: Record<TimeRangeKey, TimeRange>;
+  ranges: Record<Exclude<TimeRangeKey, "custom">, TimeRange>;
   activeKey: TimeRangeKey;
   onChange: (key: TimeRangeKey) => void;
+  customRange?: DateRange;
+  onCustomRangeChange?: (range: DateRange | undefined) => void;
+  customLabel?: string;
 }) {
-  const order: TimeRangeKey[] = ["1h", "today", "yesterday", "7d"];
-  const activeRange = ranges[activeKey];
+  const order: Exclude<TimeRangeKey, "custom">[] = ["1h", "today", "yesterday", "7d"];
+  const customActive = activeKey === "custom";
   return (
     <div
       role="group"
       aria-label="Time range"
-      title={describeRange(activeRange)}
       className={toolbarSegmentClass}
     >
       {order.map((k) => {
@@ -2957,6 +3000,35 @@ function TimeRangePicker({
           </button>
         );
       })}
+      {onCustomRangeChange ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              title="Pick a custom date range"
+              className={cn(
+                toolbarSegmentButtonClass,
+                "gap-1.5 border-l border-black/10",
+                customActive
+                  ? "bg-black text-white"
+                  : "text-black/70 hover:bg-black/5",
+              )}
+            >
+              <CalendarIcon className="h-3.5 w-3.5" />
+              {customActive && customLabel ? customLabel : "Custom"}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="range"
+              selected={customRange}
+              onSelect={onCustomRangeChange}
+              numberOfMonths={2}
+              defaultMonth={customRange?.from ?? new Date()}
+            />
+          </PopoverContent>
+        </Popover>
+      ) : null}
     </div>
   );
 }
