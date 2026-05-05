@@ -1866,12 +1866,16 @@ function InsightCard({
  */
 function VisualStatCard({
   title,
-  value,
+  number,
+  postfix,
+  decimals = 0,
   detail,
   caption,
 }: {
   title: string;
-  value: string;
+  number: number | null | undefined;
+  postfix?: string;
+  decimals?: number;
   detail?: string;
   /** Optional secondary number displayed inline (e.g. peer total). */
   caption?: string;
@@ -1880,6 +1884,8 @@ function VisualStatCard({
   tone?: "neutral" | "positive" | "warn" | "bad" | "accent";
   icon?: React.ReactNode;
 }) {
+  const displayValue =
+    number != null && !isNaN(number) ? Number(number.toFixed(decimals)) : null;
   const compact = useCompact();
   return (
     <div className={cn("flex flex-col", compact ? "p-2" : "p-2")}>
