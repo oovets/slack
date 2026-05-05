@@ -68,24 +68,15 @@ export function MetricItem({
       </div>
       <div className="pl-[12px] text-black">
         <h2 
-          className={`whitespace-nowrap font-medium text-[15px] ${
-            layout === "portrait" ? "pp-neue-montreal" : "eidra-sans"
-          }`}
+          className="eidra-sans whitespace-nowrap font-medium text-[15px]"
           style={{
             textRendering: 'geometricPrecision',
           }}
-          // style={{ 
-          //   color: 'var(--text-color)',
-          //   fontSize: 'var(--font-size-base)',
-          //   fontWeight: 'var(--font-weight-medium)',
-          // }}
         >
           {name}
         </h2>
         <h1 
-          className={`flex items-baseline font-bold ${numberSizeClass} ml-[-4px] ${
-            layout === "portrait" ? "pp-neue-montreal" : "eidra-sans"
-          }`}
+          className={`eidra-sans flex items-baseline font-bold ${numberSizeClass} ml-[-2px]`}
           // style={{ 
           //   color: 'var(--text-color)',
           //   fontWeight: 'var(--font-weight-bold)',
