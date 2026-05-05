@@ -392,10 +392,16 @@ function HomeContent({ campaignId, isAdmin }: { campaignId: string; isAdmin: boo
         )}
       </div>
     );
+
+    return (
+      <ResponsiveScale width={1920} height={1080} background="#fbfbf9">
+        {landscapeContent}
+      </ResponsiveScale>
+    );
   }
 
-  return (
-    <div className="relative flex h-[1920px] min-h-[1920px] w-full overflow-hidden">
+  const portraitContent = (
+    <div className="relative flex h-[1920px] min-h-[1920px] w-[1080px] overflow-hidden">
       {/* Rotated background image - clipped to 1080x1920 */}
       <div className="absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
         <div
