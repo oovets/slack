@@ -1852,14 +1852,24 @@ function InsightCard({
 }) {
   return (
     <div className="rounded-md border border-black/5 bg-white px-5 py-5">
-      <p className="pp-neue-montreal text-[13px] font-medium text-black/55">{title}</p>
       <p
-        className="pp-neue-montreal mt-2 text-[42px] font-bold leading-[44px] text-black"
+        className="eidra-sans whitespace-nowrap text-[15px] font-medium text-black"
+        style={{ textRendering: "geometricPrecision" }}
+      >
+        {title}
+      </p>
+      <p
+        className="eidra-sans -ml-[2px] mt-1 text-[42px] font-bold leading-[44px] tabular-nums text-black"
         style={{ textRendering: "geometricPrecision" }}
       >
         {value}
       </p>
-      <p className="pp-neue-montreal mt-2 text-xs font-medium text-black/45">{detail}</p>
+      <p
+        className="eidra-sans mt-2 text-[12px] font-medium text-black/50"
+        style={{ textRendering: "geometricPrecision" }}
+      >
+        {detail}
+      </p>
     </div>
   );
 }
