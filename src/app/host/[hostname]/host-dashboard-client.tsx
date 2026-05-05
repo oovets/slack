@@ -1048,11 +1048,10 @@ function Inner({ host }: { host: string }) {
         {/* HERO TITLE — typographic contrast: "Live metrics from" muted, target bold */}
         <h1
           id="dashboard-hero-title"
-          className="eidra-sans mt-2 text-center text-[60px] leading-[60px]"
+          className="eidra-sans mt-2 text-center text-[60px] font-bold leading-[60px] tracking-tight text-black"
           style={{ textRendering: "geometricPrecision" }}
         >
-          <span className="font-medium text-black/55">{heroTitle.replace(targetLabel, "").trim()} </span>
-          <span className="font-bold text-black">{targetLabel}</span>
+          {heroTitle.replace(targetLabel, "").trim()} {targetLabel}
         </h1>
 
         <Box id="block-nextm-metrics" style={boxStyles}>
