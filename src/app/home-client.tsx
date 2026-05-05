@@ -267,7 +267,7 @@ function HomeContent({ campaignId, isAdmin }: { campaignId: string; isAdmin: boo
   const campaignTitle = campaignMetrics?.campaign?.name?.trim() || "booth";
 
   if (isLandscape) {
-    return (
+    const landscapeContent = (
       <div className="relative mx-auto flex h-[1080px] min-h-[1080px] w-[1920px] min-w-[1920px] max-w-[1920px] overflow-hidden bg-[#fbfbf9]">
         <div
           id="dashboard-main"
