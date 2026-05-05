@@ -457,6 +457,7 @@ function Inner({ host }: { host: string }) {
     window.localStorage.setItem("host-dashboard-compact", compact ? "1" : "0");
   }, [compact]);
   const [timeRangeKey, setTimeRangeKey] = useState<TimeRangeKey>("today");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>(undefined);
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>("vision");
   const [uptimeWindow, setUptimeWindow] = useState<UptimeWindow>("24h");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -480,13 +481,35 @@ function Inner({ host }: { host: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rangeTick],
   );
-  const timeRange = timeRanges[timeRangeKey];
+  const timeRange: TimeRange = useMemo(() => {
+    if (timeRangeKey === "custom" && customRange?.from) {
+      const fromDate = new Date(customRange.from);
+      fromDate.setHours(0, 0, 0, 0);
+      const toBase = customRange.to ? new Date(customRange.to) : new Date(customRange.from);
+      const toDate = new Date(toBase);
+      toDate.setHours(0, 0, 0, 0);
+      toDate.setDate(toDate.getDate() + 1);
+      const fmt = (d: Date) => format(d, "MMM d");
+      const label =
+        customRange.to && customRange.from.getTime() !== customRange.to.getTime()
+          ? `${fmt(customRange.from)} – ${fmt(customRange.to)}`
+          : fmt(customRange.from);
+      return {
+        key: "custom",
+        label,
+        start: Math.floor(fromDate.getTime() / 1000),
+        end: Math.floor(toDate.getTime() / 1000),
+      };
+    }
+    return timeRanges[timeRangeKey === "custom" ? "today" : timeRangeKey];
+  }, [timeRangeKey, customRange, timeRanges]);
   const heroTitle = useMemo(() => {
     if (timeRangeKey === "yesterday") return `Yesterday metrics from ${targetLabel}`;
     if (timeRangeKey === "7d") return `Last week metrics from ${targetLabel}`;
     if (timeRangeKey === "today") return `Today metrics from ${targetLabel}`;
+    if (timeRangeKey === "custom") return `${timeRange.label} metrics from ${targetLabel}`;
     return `Live metrics from ${targetLabel}`;
-  }, [timeRangeKey, targetLabel]);
+  }, [timeRangeKey, targetLabel, timeRange.label]);
 
   // MJPEG cache-bust tick
   useEffect(() => {
