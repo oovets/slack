@@ -34,7 +34,7 @@ import { AgeGroupsSection } from "@/components/section/age-groups.section";
 import { HalfPieChartSection } from "@/components/section/half-pie-chart.section";
 import { MediaValueRacSection } from "@/components/section/media-value-rac.section";
 import { MetricsSection } from "@/components/section/metrics.section";
-import { Box } from "@/components/ui/box";
+import { Box, BoxCompactContext } from "@/components/ui/box";
 import { Footer } from "@/components/ui/footer";
 import { SlidingNumber } from "@/components/animate-ui/primitives/texts/sliding-number";
 import { ageGroupsData } from "@/lib/constants";
