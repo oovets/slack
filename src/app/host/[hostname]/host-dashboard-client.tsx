@@ -397,11 +397,11 @@ const boxStyles = {
   boxShadow: "none",
 };
 const toolbarControlClass =
-  "inline-flex h-9 items-center gap-1.5 rounded-md border border-black/10 bg-[#F5F2ED] px-3 text-[13px] font-medium leading-none text-black transition hover:bg-black/5";
+  "eidra-sans inline-flex h-9 items-center gap-1.5 rounded-md border border-black/10 bg-[#F5F2ED] px-3 text-[13px] font-bold leading-none tracking-tight text-black transition hover:bg-black/5";
 const toolbarSegmentClass =
-  "inline-flex h-9 items-center overflow-hidden rounded-md border border-black/10 bg-[#F5F2ED] text-[13px] font-medium leading-none text-black";
+  "eidra-sans inline-flex h-9 items-center overflow-hidden rounded-md border border-black/10 bg-[#F5F2ED] text-[13px] font-bold leading-none tracking-tight text-black";
 const toolbarSegmentButtonClass =
-  "inline-flex h-full items-center px-3 text-[13px] font-medium leading-none transition";
+  "eidra-sans inline-flex h-full items-center px-3 text-[13px] font-bold leading-none tracking-tight transition";
 
 /* ============================================================
  * Layout
