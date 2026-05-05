@@ -397,11 +397,11 @@ const boxStyles = {
   boxShadow: "none",
 };
 const toolbarControlClass =
-  "inline-flex h-9 items-center rounded-md border border-black/10 bg-[#F5F2ED] px-3 text-sm font-medium text-black transition hover:bg-black/5";
+  "inline-flex h-9 items-center gap-1.5 rounded-md border border-black/10 bg-[#F5F2ED] px-3 text-[13px] font-medium leading-none text-black transition hover:bg-black/5";
 const toolbarSegmentClass =
-  "inline-flex h-9 items-center overflow-hidden rounded-md border border-black/10 bg-[#F5F2ED] text-sm font-medium text-black";
+  "inline-flex h-9 items-center overflow-hidden rounded-md border border-black/10 bg-[#F5F2ED] text-[13px] font-medium leading-none text-black";
 const toolbarSegmentButtonClass =
-  "inline-flex h-full items-center px-3 text-sm font-medium transition";
+  "inline-flex h-full items-center px-3 text-[13px] font-medium leading-none transition";
 
 /* ============================================================
  * Layout
