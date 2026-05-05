@@ -1124,24 +1124,13 @@ function Inner({ host }: { host: string }) {
           </Box>
         )}
 
-        {/* HERO TITLE — typographic contrast: "Live metrics from" muted, target bold */}
-        {!compact ? (
-          <h1
-            id="dashboard-hero-title"
-            className="eidra-sans mt-2 text-center font-bold tracking-tight text-black text-[60px] leading-[60px]"
-            style={{ textRendering: "geometricPrecision" }}
-          >
-            {heroTitle.replace(targetLabel, "").trim()} {targetLabel}
-          </h1>
-        ) : null}
+        {/* MEDIA VALUE RAC — promoted to hero position above KPI cards */}
+        <Box id="block-media-value-rac" style={boxStyles} className="py-6">
+          <MediaValueRacSection racValue={totals.rac} />
+        </Box>
 
         <Box id="block-nextm-metrics" style={boxStyles}>
           <MetricsSection metricItems={nextmMetrics} columns={4} />
-        </Box>
-
-        {/* MEDIA VALUE RAC — derived from real Looked-at-camera count */}
-        <Box id="block-media-value-rac" style={boxStyles} className="py-6">
-          <MediaValueRacSection racValue={totals.rac} />
         </Box>
 
         {/* NEXTM ANALYTICS — remaining calculations.ts-derived values */}
