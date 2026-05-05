@@ -2138,19 +2138,33 @@ function AngleAward({
   label,
   camera,
   metric,
+  tone = "neutral",
 }: {
   label: string;
   camera?: DualCameraSummary | null;
   metric: keyof Pick<DualCameraSummary, "total_detections" | "rac" | "demographics_count">;
+  tone?: "neutral" | "positive" | "warn" | "bad" | "accent";
 }) {
+  const toneColor = {
+    neutral: "#1f1f1f",
+    positive: "#10b981",
+    warn: "#f59e0b",
+    bad: "#ef4444",
+    accent: "#DA7C60",
+  }[tone];
   return (
-    <div className="rounded-md border border-black/5 bg-white px-5 py-5">
-      <p className="pp-neue-montreal text-[13px] font-medium text-black/55">
+    <div className="relative overflow-hidden rounded-md border border-black/5 bg-white px-5 py-5">
+      <span
+        aria-hidden
+        className="absolute left-0 top-0 h-full w-1"
+        style={{ background: toneColor }}
+      />
+      <p className="eidra-sans text-[12px] font-bold uppercase tracking-[0.08em] text-black/55">
         Best {label}
       </p>
       <p
-        className="pp-neue-montreal mt-2 text-[42px] font-bold leading-[44px] text-black"
-        style={{ textRendering: "geometricPrecision" }}
+        className="eidra-sans mt-2 text-[42px] font-bold leading-[44px] tabular-nums tracking-tight"
+        style={{ color: toneColor, textRendering: "geometricPrecision" }}
       >
         {formatMetricNumber(camera?.[metric] ?? 0)}
       </p>
