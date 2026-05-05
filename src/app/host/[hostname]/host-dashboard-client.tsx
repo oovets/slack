@@ -396,12 +396,36 @@ const boxStyles = {
   borderStyle: "solid" as const,
   boxShadow: "none",
 };
-const toolbarControlClass =
-  "eidra-sans inline-flex h-9 items-center gap-1.5 rounded-md border border-black/10 bg-[#F5F2ED] px-3 text-[13px] font-bold leading-none tracking-tight text-black transition hover:bg-black/5";
-const toolbarSegmentClass =
-  "eidra-sans inline-flex h-9 items-center overflow-hidden rounded-md border border-black/10 bg-[#F5F2ED] text-[13px] font-bold leading-none tracking-tight text-black";
-const toolbarSegmentButtonClass =
-  "eidra-sans inline-flex h-full items-center px-3 text-[13px] font-bold leading-none tracking-tight transition";
+/** Shared typography for the entire toolbar — change here to update every
+ *  select / pill / tab / button at once. Pairs with `toolbarRowClass` (height +
+ *  vertical alignment) so all controls share one baseline. */
+const toolbarTextClass =
+  "eidra-sans text-[13px] font-bold leading-none tracking-tight";
+const toolbarRowClass = "inline-flex h-9 items-center";
+const toolbarSurfaceClass =
+  "rounded-md border border-black/10 bg-[#F5F2ED] text-black";
+const toolbarControlClass = cn(
+  toolbarRowClass,
+  toolbarSurfaceClass,
+  toolbarTextClass,
+  "gap-1.5 px-3 transition hover:bg-black/5",
+);
+const toolbarSegmentClass = cn(
+  toolbarRowClass,
+  toolbarSurfaceClass,
+  toolbarTextClass,
+  "overflow-hidden",
+);
+const toolbarSegmentButtonClass = cn(
+  "inline-flex h-full items-center px-3 transition",
+  toolbarTextClass,
+);
+const toolbarPillClass = cn(
+  toolbarRowClass,
+  toolbarSurfaceClass,
+  toolbarTextClass,
+  "gap-1.5 px-3",
+);
 
 /* ============================================================
  * Layout
