@@ -2725,9 +2725,9 @@ function KpiTile({
         {icon}
       </div>
       <div className="pl-3 text-black">
-        <h2 className="pp-neue-montreal whitespace-nowrap text-[15px] font-medium text-black/70">{label}</h2>
+        <h2 className="eidra-sans whitespace-nowrap text-[15px] font-medium text-black" style={{ textRendering: "geometricPrecision" }}>{label}</h2>
         <h1
-          className="pp-neue-montreal -ml-1 flex items-baseline text-[57px] font-bold leading-[60px] tabular-nums"
+          className="eidra-sans -ml-[2px] flex items-baseline text-[57px] font-bold leading-[60px] tabular-nums"
           style={{ textRendering: "geometricPrecision", color }}
         >
           {displayValue == null ? (
