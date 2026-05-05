@@ -1167,8 +1167,8 @@ function Inner({ host }: { host: string }) {
             className={cn(
               "grid",
               compact
-                ? "grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7"
-                : "grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4",
+                ? "grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7"
+                : "grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-3 xl:grid-cols-4",
             )}
           >
             {visibilityMetrics.map((metric) => (
@@ -1177,9 +1177,7 @@ function Inner({ host }: { host: string }) {
                 title={metric.title}
                 value={metric.value}
                 detail={metric.detail}
-                progress={metric.progress}
                 caption={metric.caption}
-                tone={metric.tone}
               />
             ))}
           </div>
@@ -1860,97 +1858,63 @@ function InsightCard({
  * optional progress fill. Used by Visibility and Dual-camera grids so values
  * read at a glance without parsing rows of text.
  */
+/**
+ * VisualStatCard — matches the dashboard's MetricItem typography (eidra-sans
+ * medium label + huge bold number) so Visibility / Dual-camera grids look
+ * native to the rest of the dashboard. No borders, no accent strips, no
+ * uppercase tracking — just the same type system every other Box uses.
+ */
 function VisualStatCard({
   title,
   value,
   detail,
-  /** 0–100. Drives the progress bar fill. */
-  progress,
-  /** Optional secondary number on the right (e.g. peer total). */
   caption,
-  tone = "neutral",
-  icon,
 }: {
   title: string;
   value: string;
   detail?: string;
-  progress?: number;
+  /** Optional secondary number displayed inline (e.g. peer total). */
   caption?: string;
+  /** Kept for API compatibility — ignored visually. */
+  progress?: number;
   tone?: "neutral" | "positive" | "warn" | "bad" | "accent";
   icon?: React.ReactNode;
 }) {
-  const toneColor = {
-    neutral: "#1f1f1f",
-    positive: "#10b981",
-    warn: "#f59e0b",
-    bad: "#ef4444",
-    accent: "#DA7C60",
-  }[tone];
-  const pct = progress == null ? null : Math.max(0, Math.min(100, progress));
   const compact = useCompact();
   return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-md border border-black/5 bg-white",
-        compact ? "px-3 py-2" : "px-5 py-5",
-      )}
-    >
-      <span
-        aria-hidden
-        className="absolute left-0 top-0 h-full w-1"
-        style={{ background: toneColor }}
-      />
-      <div className="flex items-start justify-between gap-2">
-        <p
-          className={cn(
-            "eidra-sans font-bold uppercase tracking-[0.08em] text-black/55",
-            compact ? "text-[10px]" : "text-[12px]",
-          )}
-        >
-          {title}
-        </p>
-        {icon && !compact ? (
-          <span className="text-black/35" aria-hidden>
-            {icon}
-          </span>
-        ) : null}
-      </div>
-      <div className={cn("flex items-baseline gap-2", compact ? "mt-0.5" : "mt-2")}>
-        <p
-          className={cn(
-            "eidra-sans font-bold tabular-nums tracking-tight",
-            compact ? "text-[20px] leading-[22px]" : "text-[42px] leading-[44px]",
-          )}
-          style={{ color: toneColor, textRendering: "geometricPrecision" }}
-        >
-          {value}
-        </p>
+    <div className={cn("flex flex-col", compact ? "p-2" : "p-2")}>
+      <h2
+        className={cn(
+          "eidra-sans whitespace-nowrap font-medium text-black",
+          compact ? "text-[12px]" : "text-[15px]",
+        )}
+        style={{ textRendering: "geometricPrecision" }}
+      >
+        {title}
+      </h2>
+      <h1
+        className={cn(
+          "eidra-sans -ml-[2px] flex items-baseline font-bold tabular-nums text-black",
+          compact ? "text-[22px] leading-[24px]" : "text-[57px] leading-[60px]",
+        )}
+        style={{ textRendering: "geometricPrecision" }}
+      >
+        {value}
         {caption ? (
           <span
             className={cn(
-              "eidra-sans font-bold text-black/35 tabular-nums",
-              compact ? "text-[10px]" : "text-[13px]",
+              "eidra-sans ml-1.5 font-medium text-black/35",
+              compact ? "text-[10px]" : "text-[14px]",
             )}
           >
             {caption}
           </span>
         ) : null}
-      </div>
-      {pct != null ? (
-        <div
-          className={cn(
-            "w-full overflow-hidden rounded-full bg-black/[0.06]",
-            compact ? "mt-1.5 h-1" : "mt-3 h-1.5",
-          )}
-        >
-          <div
-            className="h-full rounded-full transition-[width] duration-500 ease-out"
-            style={{ width: `${pct}%`, background: toneColor }}
-          />
-        </div>
-      ) : null}
+      </h1>
       {detail && !compact ? (
-        <p className="pp-neue-montreal mt-3 text-xs font-medium text-black/45">{detail}</p>
+        <p className="pp-neue-montreal mt-1 text-[12px] font-medium text-black/50">
+          {detail}
+        </p>
       ) : null}
     </div>
   );
@@ -2055,112 +2019,99 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
 
   const compact = useCompact();
   return (
-    <div className={compact ? "space-y-2" : "space-y-4"}>
+    <div className={compact ? "space-y-3" : "space-y-8"}>
+      {/* Headline KPIs — same MetricItem-style typography as the rest of the
+          dashboard. No borders, no colored strips. */}
       <div
         className={cn(
           "grid",
           compact
-            ? "grid-cols-2 gap-1.5 md:grid-cols-4"
-            : "grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4",
+            ? "grid-cols-2 gap-x-4 gap-y-2 md:grid-cols-4"
+            : "grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 xl:grid-cols-4",
         )}
       >
         <VisualStatCard
           title="Audience confidence"
           value={`${formatMetricNumber(confidence, 1)}%`}
-          detail="Overlap, detection balance and RAC balance"
-          progress={confidence}
-          tone={confidenceTone}
+          detail="Overlap, detection balance, RAC balance"
         />
         <VisualStatCard
           title="Angle agreement"
           value={`${formatMetricNumber(angleAgreement, 1)}%`}
           detail={`${formatMetricNumber(insight.confirmed_by_multiple_angles ?? 0)} confirmed by multiple angles`}
-          progress={angleAgreement}
-          tone="accent"
         />
         <VisualStatCard
           title="Double-count prevented"
           value={formatMetricNumber(insight.double_count_prevented ?? 0)}
           caption={rawSum ? `/ ${formatMetricNumber(rawSum)}` : undefined}
           detail="Raw camera contacts deduplicated"
-          progress={dedupePct}
-          tone="positive"
         />
         <VisualStatCard
           title="Synced activity"
           value={`${formatMetricNumber(synced, 1)}%`}
           detail={`${formatMetricNumber(insight.synced_bucket_count ?? 0)} / ${formatMetricNumber(insight.active_bucket_count ?? 0)} active buckets`}
-          progress={synced}
-          tone="neutral"
         />
       </div>
 
-      <div className="rounded-md border border-black/5 bg-white px-5 py-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="eidra-sans text-[13px] font-bold tracking-tight text-black">
-              Cross-angle dedupe
-            </p>
-            <p className="pp-neue-montreal mt-1 text-xs font-medium text-black/45">
-              Deduped audience: {formatMetricNumber(insight.deduped_audience ?? 0)} · single-angle only: {formatMetricNumber(insight.single_angle_only ?? 0)}
-            </p>
-          </div>
-          <div className="eidra-sans rounded-full bg-black px-3 py-1 text-[11px] font-bold tracking-tight text-white">
-            {formatMetricNumber(insight.camera_count)} cams
-          </div>
-        </div>
-
-        <div className="space-y-3">
+      {/* Per-camera breakdown */}
+      <div>
+        <SubSectionHeader
+          title="Per-camera"
+          meta={`${formatMetricNumber(insight.camera_count)} cams · deduped ${formatMetricNumber(insight.deduped_audience ?? 0)} · single-angle ${formatMetricNumber(insight.single_angle_only ?? 0)}`}
+          compact={compact}
+        />
+        <div className={compact ? "mt-2 space-y-2" : "mt-4 space-y-4"}>
           {cameras.map((camera) => (
             <div
               key={camera.camera_id}
-              className="rounded-md border border-black/5 bg-[#fbfbf9] px-4 py-3"
+              className={cn("border-t border-black/[0.06] pt-2", compact ? "pt-2" : "pt-4")}
             >
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="eidra-sans truncate text-[13px] font-bold tracking-tight text-black">
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <span
+                  className={cn(
+                    "eidra-sans font-bold tracking-tight text-black",
+                    compact ? "text-[13px]" : "text-[18px]",
+                  )}
+                  style={{ textRendering: "geometricPrecision" }}
+                >
                   {camera.camera_id}
                 </span>
-                <span className="pp-neue-montreal text-[11px] font-medium text-black/45 tabular-nums">
-                  {formatMetricNumber(camera.looked_pct, 1)}% looked
+                <span className="pp-neue-montreal text-[12px] font-medium tabular-nums text-black/50">
+                  {formatMetricNumber(camera.looked_pct, 1)}% looked at screen
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <CameraBar
-                  label="Detections"
-                  value={camera.total_detections}
-                  max={maxCamDetections}
-                  color="#1f1f1f"
-                />
-                <CameraBar
-                  label="RAC"
-                  value={camera.rac}
-                  max={maxCamRac}
-                  color="#DA7C60"
-                />
-                <CameraBar
-                  label="Unique"
-                  value={camera.unique_persons}
-                  max={maxCamUnique}
-                  color="#10b981"
-                />
+              <div className={cn("grid grid-cols-3", compact ? "gap-3" : "gap-6")}>
+                <CameraBar label="Detections" value={camera.total_detections} max={maxCamDetections} />
+                <CameraBar label="RAC" value={camera.rac} max={maxCamRac} />
+                <CameraBar label="Unique" value={camera.unique_persons} max={maxCamUnique} />
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="rounded-md border border-black/5 bg-white px-5 py-5">
-        <p className="eidra-sans mb-4 text-[13px] font-bold tracking-tight text-black">Best angles</p>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <AngleAward label="Detection" camera={insight.best_detection_camera} metric="total_detections" tone="neutral" />
-          <AngleAward label="Attention" camera={insight.best_attention_camera} metric="rac" tone="accent" />
-          <AngleAward label="Demographics" camera={insight.best_demographics_camera} metric="demographics_count" tone="positive" />
+      {/* Best angles */}
+      <div>
+        <SubSectionHeader title="Best angles" compact={compact} />
+        <div
+          className={cn(
+            "grid",
+            compact ? "mt-2 grid-cols-3 gap-x-4" : "mt-4 grid-cols-1 gap-x-6 gap-y-6 md:grid-cols-3",
+          )}
+        >
+          <AngleAward label="Detection" camera={insight.best_detection_camera} metric="total_detections" />
+          <AngleAward label="Attention" camera={insight.best_attention_camera} metric="rac" />
+          <AngleAward label="Demographics" camera={insight.best_demographics_camera} metric="demographics_count" />
         </div>
         {confirmedReach.length >= 2 ? (
-          <div className="mt-5">
-            <div className="mb-2 flex justify-between text-[11px] font-medium uppercase tracking-[0.12em] text-black/35">
-              <span>Confirmed reach over time</span>
-              <span>peak {formatMetricNumber(Math.max(...confirmedReach, 0))}</span>
+          <div className={compact ? "mt-3" : "mt-6"}>
+            <div className="mb-2 flex items-baseline justify-between">
+              <span className="pp-neue-montreal text-[12px] font-medium text-black/50">
+                Confirmed reach over time
+              </span>
+              <span className="pp-neue-montreal text-[12px] font-medium tabular-nums text-black/50">
+                peak {formatMetricNumber(Math.max(...confirmedReach, 0))}
+              </span>
             </div>
             <Sparkline data={confirmedReach} stroke="#316a53" />
           </div>
@@ -2170,35 +2121,83 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
   );
 }
 
+/** Inline subsection header inside a Box — uses the same eidra-sans bold
+ *  family as the box title, just smaller, with an underline accent that
+ *  mirrors the Box title underline so subsections feel native. */
+function SubSectionHeader({
+  title,
+  meta,
+  compact,
+}: {
+  title: string;
+  meta?: string;
+  compact: boolean;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-3">
+      <div>
+        <h4
+          className={cn(
+            "eidra-sans font-bold tracking-tight text-black",
+            compact ? "text-[14px] leading-[14px]" : "text-[20px] leading-[20px]",
+          )}
+          style={{ textRendering: "geometricPrecision" }}
+        >
+          {title}
+        </h4>
+        <span
+          aria-hidden
+          className={cn(
+            "mt-2 block h-[2px] rounded-full bg-black/80",
+            compact ? "w-[24px]" : "w-[32px]",
+          )}
+        />
+      </div>
+      {meta ? (
+        <span className="pp-neue-montreal text-[12px] font-medium tabular-nums text-black/50">
+          {meta}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function CameraBar({
   label,
   value,
   max,
-  color,
 }: {
   label: string;
   value: number;
   max: number;
-  color: string;
 }) {
+  const compact = useCompact();
   const pct = max > 0 ? Math.max(2, Math.min(100, (value / max) * 100)) : 0;
   return (
     <div>
-      <div className="mb-1 flex items-baseline justify-between gap-1">
-        <span className="eidra-sans text-[10px] font-bold uppercase tracking-[0.08em] text-black/45">
+      <div className="flex items-baseline justify-between gap-2">
+        <span
+          className={cn(
+            "eidra-sans font-medium text-black",
+            compact ? "text-[11px]" : "text-[13px]",
+          )}
+        >
           {label}
         </span>
         <span
-          className="eidra-sans text-[14px] font-bold tabular-nums tracking-tight"
-          style={{ color }}
+          className={cn(
+            "eidra-sans font-bold tabular-nums tracking-tight text-black",
+            compact ? "text-[15px]" : "text-[22px]",
+          )}
+          style={{ textRendering: "geometricPrecision" }}
         >
           {formatMetricNumber(value)}
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
+      <div className={cn("mt-1 w-full overflow-hidden rounded-full bg-black/[0.06]", compact ? "h-1" : "h-1.5")}>
         <div
-          className="h-full rounded-full transition-[width] duration-500 ease-out"
-          style={{ width: `${pct}%`, background: color }}
+          className="h-full rounded-full bg-black transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%` }}
         />
       </div>
     </div>
@@ -2209,52 +2208,34 @@ function AngleAward({
   label,
   camera,
   metric,
-  tone = "neutral",
 }: {
   label: string;
   camera?: DualCameraSummary | null;
   metric: keyof Pick<DualCameraSummary, "total_detections" | "rac" | "demographics_count">;
-  tone?: "neutral" | "positive" | "warn" | "bad" | "accent";
 }) {
-  const toneColor = {
-    neutral: "#1f1f1f",
-    positive: "#10b981",
-    warn: "#f59e0b",
-    bad: "#ef4444",
-    accent: "#DA7C60",
-  }[tone];
   const compact = useCompact();
   return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-md border border-black/5 bg-white",
-        compact ? "px-3 py-2" : "px-5 py-5",
-      )}
-    >
-      <span
-        aria-hidden
-        className="absolute left-0 top-0 h-full w-1"
-        style={{ background: toneColor }}
-      />
-      <p
+    <div className="flex flex-col p-2">
+      <h2
         className={cn(
-          "eidra-sans font-bold uppercase tracking-[0.08em] text-black/55",
-          compact ? "text-[10px]" : "text-[12px]",
+          "eidra-sans whitespace-nowrap font-medium text-black",
+          compact ? "text-[12px]" : "text-[15px]",
         )}
+        style={{ textRendering: "geometricPrecision" }}
       >
         Best {label}
-      </p>
-      <p
+      </h2>
+      <h1
         className={cn(
-          "eidra-sans font-bold tabular-nums tracking-tight",
-          compact ? "mt-0.5 text-[20px] leading-[22px]" : "mt-2 text-[42px] leading-[44px]",
+          "eidra-sans -ml-[2px] flex items-baseline font-bold tabular-nums text-black",
+          compact ? "text-[22px] leading-[24px]" : "text-[57px] leading-[60px]",
         )}
-        style={{ color: toneColor, textRendering: "geometricPrecision" }}
+        style={{ textRendering: "geometricPrecision" }}
       >
         {formatMetricNumber(camera?.[metric] ?? 0)}
-      </p>
+      </h1>
       {!compact ? (
-        <p className="pp-neue-montreal mt-2 truncate font-mono text-xs font-medium text-black/45">
+        <p className="pp-neue-montreal mt-1 truncate text-[12px] font-medium text-black/50">
           {camera?.camera_id ?? "—"}
         </p>
       ) : null}
