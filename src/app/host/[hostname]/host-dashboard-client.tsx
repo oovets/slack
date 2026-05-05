@@ -932,8 +932,8 @@ function Inner({ host }: { host: string }) {
       className="fixed inset-0 z-0 w-full overflow-y-auto bg-[#fbfbf9]"
     >
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-10 py-10">
-        {/* TOOLBAR — host picker + pause / fullscreen */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* TOOLBAR — sticky so it remains reachable while scrolling long dashboards */}
+        <div className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-3 rounded-xl border border-black/5 bg-[#fbfbf9]/85 px-4 py-3 shadow-[0_1px_0_rgba(0,0,0,0.04)] backdrop-blur-md supports-[backdrop-filter]:bg-[#fbfbf9]/70">
           <select
             value={host}
             onChange={(e) => router.push(`/host/${encodeURIComponent(e.target.value)}`)}
@@ -989,12 +989,22 @@ function Inner({ host }: { host: string }) {
               activeKey={timeRangeKey}
               onChange={setTimeRangeKey}
             />
-            <span>
+            <span className="inline-flex items-center gap-1.5" aria-live="polite">
+              <span
+                className={cn(
+                  "inline-block h-1.5 w-1.5 rounded-full",
+                  paused
+                    ? "bg-amber-500"
+                    : "bg-emerald-500 [animation:pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]",
+                )}
+                aria-hidden
+              />
               {overview ? `Last: ${new Date(overview.sampled_at * 1000).toLocaleTimeString("en-GB")}` : "—"}
             </span>
             <button
               onClick={() => setPaused((p) => !p)}
               className={cn(toolbarControlClass, "gap-1")}
+              title={paused ? "Resume live updates" : "Pause live updates"}
             >
               {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
               {paused ? "Resume" : "Pause"}
@@ -1002,6 +1012,7 @@ function Inner({ host }: { host: string }) {
             <button
               onClick={toggleFullscreen}
               className={cn(toolbarControlClass, "gap-1")}
+              title={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
               <Maximize2 className="h-4 w-4" /> {fullscreen ? "Exit" : "Fullscreen"}
             </button>
@@ -1026,13 +1037,14 @@ function Inner({ host }: { host: string }) {
           </Box>
         )}
 
-        {/* HERO TITLE — mirrors NextM "Live metrics from <campaign>" */}
+        {/* HERO TITLE — typographic contrast: "Live metrics from" muted, target bold */}
         <h1
           id="dashboard-hero-title"
-          className="eidra-sans mt-2 text-center text-[60px] font-bold leading-[60px] text-black"
+          className="eidra-sans mt-2 text-center text-[60px] leading-[60px]"
           style={{ textRendering: "geometricPrecision" }}
         >
-          {heroTitle}
+          <span className="font-medium text-black/55">{heroTitle.replace(targetLabel, "").trim()} </span>
+          <span className="font-bold text-black">{targetLabel}</span>
         </h1>
 
         <Box id="block-nextm-metrics" style={boxStyles}>
@@ -1111,19 +1123,23 @@ function Inner({ host }: { host: string }) {
         {/* UPTIME — heartbeat history per host */}
         <Box id="block-uptime" title="Uptime" style={boxStyles}>
           <div className="mb-3 flex items-center gap-2">
-            {(["24h", "7d", "30d"] as UptimeWindow[]).map((w) => (
-              <button
-                key={w}
-                onClick={() => setUptimeWindow(w)}
-                className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
-                  uptimeWindow === w
-                    ? "bg-black text-white"
-                    : "border border-black/10 bg-white text-black/70 hover:bg-black/5"
-                }`}
-              >
-                {w}
-              </button>
-            ))}
+            <div role="group" aria-label="Uptime window" className={toolbarSegmentClass}>
+              {(["24h", "7d", "30d"] as UptimeWindow[]).map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => setUptimeWindow(w)}
+                  className={cn(
+                    toolbarSegmentButtonClass,
+                    uptimeWindow === w
+                      ? "bg-black text-white"
+                      : "text-black/70 hover:bg-black/5",
+                  )}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
             <div className="ml-auto text-[12px] text-black/50">
               {uptime?.sample_count != null
                 ? `${uptime.sample_count.toLocaleString()} scrapes · victoriametrics`
@@ -1491,26 +1507,41 @@ function CollapsibleBox({
       <button
         type="button"
         onClick={toggle}
-        className="flex w-full items-center justify-between text-left"
+        className="group flex w-full items-center justify-between text-left"
         aria-expanded={open}
         aria-controls={`${id}-content`}
       >
-        <h3
-          id={`${id}-title`}
-          className="eidra-sans text-[36px] font-bold leading-[14px] text-black"
-          style={{ textRendering: "geometricPrecision" }}
-        >
-          {title}
-        </h3>
-        <span className="ml-4 inline-flex h-9 w-9 items-center justify-center rounded-md border border-black/10 text-black hover:bg-black/5">
-          {open ? (
-            <ChevronUp className="h-5 w-5" />
-          ) : (
-            <ChevronDown className="h-5 w-5" />
-          )}
+        <div>
+          <h3
+            id={`${id}-title`}
+            className="eidra-sans text-[36px] font-bold leading-[14px] tracking-tight text-black"
+            style={{ textRendering: "geometricPrecision" }}
+          >
+            {title}
+          </h3>
+          <span
+            aria-hidden
+            className={cn(
+              "mt-[18px] block h-[2px] rounded-full bg-black/80 transition-all duration-300",
+              open ? "w-[44px]" : "w-[20px] bg-black/40 group-hover:w-[44px] group-hover:bg-black/80",
+            )}
+          />
+        </div>
+        <span className="ml-4 inline-flex h-9 w-9 items-center justify-center rounded-md border border-black/10 text-black transition-colors hover:bg-black/5">
+          <ChevronDown
+            className={cn("h-5 w-5 transition-transform duration-300", open && "rotate-180")}
+          />
         </span>
       </button>
-      {open && <div id={`${id}-content`} className="mt-[34px]">{children}</div>}
+      <div
+        id={`${id}-content`}
+        className={cn(
+          "grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out",
+          open ? "mt-[34px] grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="overflow-hidden">{children}</div>
+      </div>
     </div>
   );
 }
@@ -1524,13 +1555,21 @@ function Pill({
   icon: React.ReactNode;
   label: string;
 }) {
-  const cls = {
-    good: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
-    bad: "bg-red-500/15 text-red-700 border-red-500/30",
-    warn: "bg-amber-500/15 text-amber-700 border-amber-500/30",
+  const dotColor = {
+    good: "#10b981",
+    bad: "#ef4444",
+    warn: "#f59e0b",
   }[tone];
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium", cls)}>
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-[#F5F2ED] px-3 py-1 text-xs font-medium text-black"
+      title={label}
+    >
+      <span
+        aria-hidden
+        className="inline-block h-1.5 w-1.5 rounded-full"
+        style={{ background: dotColor }}
+      />
       {icon}
       {label}
     </span>
@@ -1599,10 +1638,11 @@ function BleCsiTab({
     <>
       <h1
         id="dashboard-ble-csi-title"
-        className="eidra-sans mt-2 text-center text-[60px] font-bold leading-[60px] text-black"
+        className="eidra-sans mt-2 text-center text-[60px] leading-[60px]"
         style={{ textRendering: "geometricPrecision" }}
       >
-        BLE / CSI from {data?.host ?? "host"}
+        <span className="font-medium text-black/55">BLE / CSI from </span>
+        <span className="font-bold text-black">{data?.host ?? "host"}</span>
       </h1>
 
       <Box id="block-ble-csi-kpis" style={boxStyles}>
@@ -2352,9 +2392,15 @@ function KpiTile({
   thresholds?: [warn: number, crit: number];
 }) {
   let color = "#000000";
+  let tileBg = "linear-gradient(135deg, #63A8A5 0%, #DA7C60 100%)";
   if (thresholds && value != null) {
-    if (value >= thresholds[1]) color = "#cc2d2d";
-    else if (value >= thresholds[0]) color = "#cc8a2d";
+    if (value >= thresholds[1]) {
+      color = "#b91c1c";
+      tileBg = "linear-gradient(135deg, #DA7C60 0%, #b91c1c 100%)";
+    } else if (value >= thresholds[0]) {
+      color = "#b45309";
+      tileBg = "linear-gradient(135deg, #DA7C60 0%, #b45309 100%)";
+    }
   }
   const displayValue =
     value != null && !isNaN(value)
@@ -2363,19 +2409,19 @@ function KpiTile({
   return (
     <div className="flex flex-row p-2">
       <div
-        className="flex h-[90px] w-[90px] flex-shrink-0 items-center justify-center rounded-md"
-        style={{ background: "linear-gradient(135deg, #63A8A5 0%, #DA7C60 100%)" }}
+        className="flex h-[90px] w-[90px] flex-shrink-0 items-center justify-center rounded-md transition-colors"
+        style={{ background: tileBg }}
       >
         {icon}
       </div>
       <div className="pl-3 text-black">
-        <h2 className="pp-neue-montreal whitespace-nowrap text-[15px] font-medium">{label}</h2>
+        <h2 className="pp-neue-montreal whitespace-nowrap text-[15px] font-medium text-black/70">{label}</h2>
         <h1
-          className="pp-neue-montreal -ml-1 flex items-baseline text-[57px] font-bold leading-[60px]"
+          className="pp-neue-montreal -ml-1 flex items-baseline text-[57px] font-bold leading-[60px] tabular-nums"
           style={{ textRendering: "geometricPrecision", color }}
         >
           {displayValue == null ? (
-            <span>—</span>
+            <span className="text-black/30">—</span>
           ) : (
             <SlidingNumber
               animateOnLoad={false}
@@ -2575,32 +2621,38 @@ function TimeRangePicker({
   onChange: (key: TimeRangeKey) => void;
 }) {
   const order: TimeRangeKey[] = ["1h", "today", "yesterday", "7d"];
+  const activeRange = ranges[activeKey];
   return (
-    <div
-      role="group"
-      aria-label="Time range"
-      className={toolbarSegmentClass}
-    >
-      {order.map((k) => {
-        const r = ranges[k];
-        const active = k === activeKey;
-        return (
-          <button
-            key={k}
-            type="button"
-            onClick={() => onChange(k)}
-            title={describeRange(r)}
-            className={cn(
-              toolbarSegmentButtonClass,
-              active
-                ? "bg-black text-white"
-                : "text-black/70 hover:bg-black/5",
-            )}
-          >
-            {r.label}
-          </button>
-        );
-      })}
+    <div className="flex flex-col items-end gap-1">
+      <div
+        role="group"
+        aria-label="Time range"
+        className={toolbarSegmentClass}
+      >
+        {order.map((k) => {
+          const r = ranges[k];
+          const active = k === activeKey;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => onChange(k)}
+              title={describeRange(r)}
+              className={cn(
+                toolbarSegmentButtonClass,
+                active
+                  ? "bg-black text-white"
+                  : "text-black/70 hover:bg-black/5",
+              )}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
+      <span className="text-[10px] uppercase tracking-wider text-black/40 tabular-nums">
+        {describeRange(activeRange)}
+      </span>
     </div>
   );
 }
