@@ -1192,16 +1192,6 @@ function Inner({ host }: { host: string }) {
           </div>
         </Box>
 
-        {/* AGGREGATE GENDER + AGE — NextM-style pair */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <Box id="block-gender" title="Contacts by gender" style={boxStyles}>
-            <HalfPieChartSection contactsByGender={totals.contactsByGender} />
-          </Box>
-          <Box id="block-age" title="Age groups" style={boxStyles}>
-            <AgeGroupsSection ageGroups={ageGroups} />
-          </Box>
-        </div>
-
         {!isTagTarget ? (
           <>
         {/* SYSTEM KPI TILES */}
