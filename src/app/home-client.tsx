@@ -550,6 +550,12 @@ function HomeContent({ campaignId, isAdmin }: { campaignId: string; isAdmin: boo
       )}
     </div>
   );
+
+  return (
+    <ResponsiveScale width={1080} height={1920} background="#000">
+      {portraitContent}
+    </ResponsiveScale>
+  );
 }
 
 export default HomeContent;
