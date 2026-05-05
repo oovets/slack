@@ -30,6 +30,20 @@ export function MetricItem({
     postfix = 'h';
   }
 
+  // Auto-shrink number font size based on formatted length to prevent overflow
+  const formatted = Math.abs(Number(amount)).toFixed(decimalPlaces ?? 0);
+  const intDigits = formatted.split('.')[0].length;
+  const thousandsSeps = Math.max(0, Math.floor((intDigits - 1) / 3));
+  const visibleLen =
+    formatted.length +
+    thousandsSeps +
+    (postfix ? postfix.length : 0);
+
+  let numberSizeClass = 'text-[57px] leading-[60px]';
+  if (visibleLen >= 11) numberSizeClass = 'text-[32px] leading-[36px]';
+  else if (visibleLen >= 9) numberSizeClass = 'text-[40px] leading-[44px]';
+  else if (visibleLen >= 7) numberSizeClass = 'text-[48px] leading-[52px]';
+
   return (
     <div className="p-[8px] flex flex-1 flex-row" id={`metric-${icon}`}>
       <div 
