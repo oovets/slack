@@ -1118,7 +1118,10 @@ function Inner({ host }: { host: string }) {
         {/* HERO TITLE — typographic contrast: "Live metrics from" muted, target bold */}
         <h1
           id="dashboard-hero-title"
-          className="eidra-sans mt-2 text-center text-[60px] font-bold leading-[60px] tracking-tight text-black"
+          className={cn(
+            "eidra-sans text-center font-bold tracking-tight text-black",
+            compact ? "mt-0 text-[20px] leading-[24px]" : "mt-2 text-[60px] leading-[60px]",
+          )}
           style={{ textRendering: "geometricPrecision" }}
         >
           {heroTitle.replace(targetLabel, "").trim()} {targetLabel}
