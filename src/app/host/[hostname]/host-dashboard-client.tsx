@@ -886,43 +886,61 @@ function Inner({ host }: { host: string }) {
   const showDualCamera =
     !isTagTarget && ((dualCamera?.available ?? false) || (dualCamera?.camera_count ?? cams.length) > 1);
 
-  const visibilityMetrics = useMemo(() => [
-    {
-      title: "Looked at screen",
-      value: `${formatMetricNumber(totals.lookedAtScreenPct, 1)}%`,
-      detail: "Unique contacts / aggregated audience",
-    },
-    {
-      title: "Looked away",
-      value: `${formatMetricNumber(totals.lookedAwayPct, 1)}%`,
-      detail: "Audience not converted into contacts",
-    },
-    {
-      title: "Avg spent in zone",
-      value: `${formatMetricNumber(totals.avgSpentInZone, 1)}s`,
-      detail: "Total observation time / unique contacts",
-    },
-    {
-      title: "Total observation time",
-      value: `${formatMetricNumber(totals.totalObservationMinutes, 1)}m`,
-      detail: "All looking-at-screen observations",
-    },
-    {
-      title: "Total unique contacts",
-      value: formatMetricNumber(totals.unique),
-      detail: "Deduped people with camera attention",
-    },
-    {
-      title: "Total humans",
-      value: formatMetricNumber(totals.detections),
-      detail: "All analytics records in the window",
-    },
-    {
-      title: "Not reached",
-      value: formatMetricNumber(totals.notReached),
-      detail: "Total humans minus unique contacts",
-    },
-  ], [totals]);
+  const visibilityMetrics = useMemo(() => {
+    const totalHumans = totals.detections || 0;
+    const pctOf = (n: number) =>
+      totalHumans > 0 ? Math.max(0, Math.min(100, (n / totalHumans) * 100)) : 0;
+    return [
+      {
+        title: "Looked at screen",
+        value: `${formatMetricNumber(totals.lookedAtScreenPct, 1)}%`,
+        detail: "Unique contacts / aggregated audience",
+        progress: totals.lookedAtScreenPct,
+        tone: "positive" as const,
+      },
+      {
+        title: "Looked away",
+        value: `${formatMetricNumber(totals.lookedAwayPct, 1)}%`,
+        detail: "Audience not converted into contacts",
+        progress: totals.lookedAwayPct,
+        tone: "warn" as const,
+      },
+      {
+        title: "Avg spent in zone",
+        value: `${formatMetricNumber(totals.avgSpentInZone, 1)}s`,
+        detail: "Total observation time / unique contacts",
+        tone: "neutral" as const,
+      },
+      {
+        title: "Total observation time",
+        value: `${formatMetricNumber(totals.totalObservationMinutes, 1)}m`,
+        detail: "All looking-at-screen observations",
+        tone: "accent" as const,
+      },
+      {
+        title: "Total unique contacts",
+        value: formatMetricNumber(totals.unique),
+        caption: totalHumans ? `/ ${formatMetricNumber(totalHumans)}` : undefined,
+        detail: "Deduped people with camera attention",
+        progress: pctOf(totals.unique),
+        tone: "positive" as const,
+      },
+      {
+        title: "Total humans",
+        value: formatMetricNumber(totals.detections),
+        detail: "All analytics records in the window",
+        tone: "neutral" as const,
+      },
+      {
+        title: "Not reached",
+        value: formatMetricNumber(totals.notReached),
+        caption: totalHumans ? `/ ${formatMetricNumber(totalHumans)}` : undefined,
+        detail: "Total humans minus unique contacts",
+        progress: pctOf(totals.notReached),
+        tone: "bad" as const,
+      },
+    ];
+  }, [totals]);
 
   const ageGroups = useMemo<AgeGroupItem[]>(() => {
     const percentages = summary?.totals?.age_groups?.percentages ?? {};
