@@ -2991,6 +2991,7 @@ function TimeRangePicker({
             title={describeRange(r)}
             className={cn(
               toolbarSegmentButtonClass,
+              "px-2 sm:px-3",
               active
                 ? "bg-black text-white"
                 : "text-black/70 hover:bg-black/5",
@@ -3008,14 +3009,16 @@ function TimeRangePicker({
               title="Pick a custom date range"
               className={cn(
                 toolbarSegmentButtonClass,
-                "gap-1.5 border-l border-black/10",
+                "gap-1.5 border-l border-black/10 px-2 sm:px-3 max-w-[160px] sm:max-w-none truncate",
                 customActive
                   ? "bg-black text-white"
                   : "text-black/70 hover:bg-black/5",
               )}
             >
-              <CalendarIcon className="h-3.5 w-3.5" />
-              {customActive && customLabel ? customLabel : "Custom"}
+              <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">
+                {customActive && customLabel ? customLabel : "Custom"}
+              </span>
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0 bg-[#F5F2ED] border border-black/10 shadow-lg" align="end">
@@ -3023,7 +3026,7 @@ function TimeRangePicker({
               mode="range"
               selected={customRange}
               onSelect={onCustomRangeChange}
-              numberOfMonths={2}
+              numberOfMonths={typeof window !== "undefined" && window.innerWidth < 640 ? 1 : 2}
               defaultMonth={customRange?.from ?? new Date()}
             />
           </PopoverContent>
