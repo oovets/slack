@@ -932,52 +932,58 @@ function Inner({ host }: { host: string }) {
     >
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-10 py-10">
         {/* TOOLBAR — sticky so it remains reachable while scrolling long dashboards */}
-        <div className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-3 rounded-xl border border-black/5 bg-[#fbfbf9]/85 px-4 py-3 shadow-[0_1px_0_rgba(0,0,0,0.04)] backdrop-blur-md supports-[backdrop-filter]:bg-[#fbfbf9]/70">
-          <select
-            value={host}
-            onChange={(e) => router.push(`/host/${encodeURIComponent(e.target.value)}`)}
-            className={cn(toolbarControlClass, "font-mono")}
-          >
-            <optgroup label="Online hosts">
-              {selectableHosts.map((h) => (
-                <option key={h} value={h}>{h}</option>
-              ))}
-            </optgroup>
-            {selectableTags.length > 0 ? (
-              <optgroup label="Tailscale tags">
-                {selectableTags.map((tag) => (
-                  <option key={tag.id} value={tag.id}>
-                    {tag.label} ({tag.onlineCount}/{tag.hostCount})
-                  </option>
+        <div className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-2 rounded-xl border border-black/5 bg-[#fbfbf9]/85 px-4 py-2.5 shadow-[0_1px_0_rgba(0,0,0,0.04)] backdrop-blur-md supports-[backdrop-filter]:bg-[#fbfbf9]/70">
+          <div className="relative">
+            <select
+              value={host}
+              onChange={(e) => router.push(`/host/${encodeURIComponent(e.target.value)}`)}
+              className={cn(toolbarControlClass, "appearance-none pr-8 font-mono")}
+            >
+              <optgroup label="Online hosts">
+                {selectableHosts.map((h) => (
+                  <option key={h} value={h}>{h}</option>
                 ))}
               </optgroup>
-            ) : null}
-          </select>
+              {selectableTags.length > 0 ? (
+                <optgroup label="Tailscale tags">
+                  {selectableTags.map((tag) => (
+                    <option key={tag.id} value={tag.id}>
+                      {tag.label} ({tag.onlineCount}/{tag.hostCount})
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+            </select>
+            <ChevronDown
+              aria-hidden
+              className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-black/50"
+            />
+          </div>
 
           {isTagTarget ? (
             <Pill
               tone={isOnline ? "good" : "warn"}
-              icon={<Wifi className="h-4 w-4" />}
+              icon={<Wifi className="h-3.5 w-3.5" />}
               label={`${summary?.target?.online_count ?? 0}/${summary?.target?.host_count ?? 0} online`}
             />
           ) : (
             <Pill
               tone={isOnline ? "good" : "bad"}
-              icon={isOnline ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+              icon={isOnline ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
               label={isOnline ? "Online" : "Offline"}
             />
           )}
           {overallHealth.length === 0 ? (
-            <Pill tone="good" icon={<Activity className="h-4 w-4" />} label="Healthy" />
+            <Pill tone="good" icon={<Activity className="h-3.5 w-3.5" />} label="Healthy" />
           ) : (
             <Pill
               tone="bad"
-              icon={<AlertTriangle className="h-4 w-4" />}
+              icon={<AlertTriangle className="h-3.5 w-3.5" />}
               label={overallHealth.join(" · ")}
             />
           )}
 
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-3 text-xs text-black/60">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <DashboardTabs
               active={dashboardTab}
               onChange={setDashboardTab}
@@ -988,7 +994,10 @@ function Inner({ host }: { host: string }) {
               activeKey={timeRangeKey}
               onChange={setTimeRangeKey}
             />
-            <span className="inline-flex items-center gap-1.5" aria-live="polite">
+            <span
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-black/10 bg-[#F5F2ED] px-3 text-[12px] font-medium leading-none text-black/60 tabular-nums"
+              aria-live="polite"
+            >
               <span
                 className={cn(
                   "inline-block h-1.5 w-1.5 rounded-full",
@@ -998,22 +1007,22 @@ function Inner({ host }: { host: string }) {
                 )}
                 aria-hidden
               />
-              {overview ? `Last: ${new Date(overview.sampled_at * 1000).toLocaleTimeString("en-GB")}` : "—"}
+              {overview ? new Date(overview.sampled_at * 1000).toLocaleTimeString("en-GB") : "—"}
             </span>
             <button
               onClick={() => setPaused((p) => !p)}
-              className={cn(toolbarControlClass, "gap-1")}
+              className={toolbarControlClass}
               title={paused ? "Resume live updates" : "Pause live updates"}
             >
-              {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+              {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
               {paused ? "Resume" : "Pause"}
             </button>
             <button
               onClick={toggleFullscreen}
-              className={cn(toolbarControlClass, "gap-1")}
+              className={toolbarControlClass}
               title={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
-              <Maximize2 className="h-4 w-4" /> {fullscreen ? "Exit" : "Fullscreen"}
+              <Maximize2 className="h-3.5 w-3.5" /> {fullscreen ? "Exit" : "Fullscreen"}
             </button>
           </div>
         </div>
