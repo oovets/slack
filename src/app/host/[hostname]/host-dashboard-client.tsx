@@ -2631,36 +2631,32 @@ function TimeRangePicker({
   const order: TimeRangeKey[] = ["1h", "today", "yesterday", "7d"];
   const activeRange = ranges[activeKey];
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div
-        role="group"
-        aria-label="Time range"
-        className={toolbarSegmentClass}
-      >
-        {order.map((k) => {
-          const r = ranges[k];
-          const active = k === activeKey;
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => onChange(k)}
-              title={describeRange(r)}
-              className={cn(
-                toolbarSegmentButtonClass,
-                active
-                  ? "bg-black text-white"
-                  : "text-black/70 hover:bg-black/5",
-              )}
-            >
-              {r.label}
-            </button>
-          );
-        })}
-      </div>
-      <span className="text-[10px] uppercase tracking-wider text-black/40 tabular-nums">
-        {describeRange(activeRange)}
-      </span>
+    <div
+      role="group"
+      aria-label="Time range"
+      title={describeRange(activeRange)}
+      className={toolbarSegmentClass}
+    >
+      {order.map((k) => {
+        const r = ranges[k];
+        const active = k === activeKey;
+        return (
+          <button
+            key={k}
+            type="button"
+            onClick={() => onChange(k)}
+            title={describeRange(r)}
+            className={cn(
+              toolbarSegmentButtonClass,
+              active
+                ? "bg-black text-white"
+                : "text-black/70 hover:bg-black/5",
+            )}
+          >
+            {r.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
