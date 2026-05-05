@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   QueryClient,
@@ -19,7 +19,9 @@ import {
   Cpu,
   Database,
   HardDrive,
+  LayoutGrid,
   Maximize2,
+  Rows3,
   Pause,
   Play,
   Thermometer,
@@ -427,6 +429,11 @@ const toolbarPillClass = cn(
   "gap-1.5 px-3",
 );
 
+/** Compact mode shrinks paddings, fonts, and hides verbose details across
+ *  every card without changing the underlying values. Read with `useCompact()`. */
+const CompactContext = createContext(false);
+const useCompact = () => useContext(CompactContext);
+
 /* ============================================================
  * Layout
  * ============================================================ */
@@ -435,6 +442,14 @@ function Inner({ host }: { host: string }) {
   const [paused, setPaused] = useState(false);
   const [tick, setTick] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
+  const [compact, setCompact] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("host-dashboard-compact") === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("host-dashboard-compact", compact ? "1" : "0");
+  }, [compact]);
   const [timeRangeKey, setTimeRangeKey] = useState<TimeRangeKey>("today");
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>("vision");
   const [uptimeWindow, setUptimeWindow] = useState<UptimeWindow>("24h");
@@ -968,11 +983,15 @@ function Inner({ host }: { host: string }) {
   }, []);
 
   return (
+    <CompactContext.Provider value={compact}>
     <div
       ref={containerRef}
       className="fixed inset-0 z-0 w-full overflow-y-auto bg-[#fbfbf9]"
     >
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-10 py-10">
+      <div className={cn(
+        "mx-auto flex w-full max-w-[1400px] flex-col",
+        compact ? "gap-2 px-4 py-4" : "gap-5 px-10 py-10",
+      )}>
         {/* TOOLBAR — sticky so it remains reachable while scrolling long dashboards */}
         <div className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-2 rounded-xl border border-black/5 bg-[#fbfbf9]/85 px-4 py-2.5 shadow-[0_1px_0_rgba(0,0,0,0.04)] backdrop-blur-md supports-[backdrop-filter]:bg-[#fbfbf9]/70">
           <div className="relative">
@@ -1052,6 +1071,15 @@ function Inner({ host }: { host: string }) {
               {overview ? new Date(overview.sampled_at * 1000).toLocaleTimeString("en-GB") : "—"}
             </span>
             <button
+              onClick={() => setCompact((c) => !c)}
+              className={cn(toolbarControlClass, compact && "bg-black text-white hover:bg-black")}
+              title={compact ? "Switch to comfortable layout" : "Switch to compact overview"}
+              aria-pressed={compact}
+            >
+              {compact ? <LayoutGrid className="h-3.5 w-3.5" /> : <Rows3 className="h-3.5 w-3.5" />}
+              {compact ? "Comfort" : "Compact"}
+            </button>
+            <button
               onClick={() => setPaused((p) => !p)}
               className={toolbarControlClass}
               title={paused ? "Resume live updates" : "Pause live updates"}
@@ -1090,7 +1118,10 @@ function Inner({ host }: { host: string }) {
         {/* HERO TITLE — typographic contrast: "Live metrics from" muted, target bold */}
         <h1
           id="dashboard-hero-title"
-          className="eidra-sans mt-2 text-center text-[60px] font-bold leading-[60px] tracking-tight text-black"
+          className={cn(
+            "eidra-sans text-center font-bold tracking-tight text-black",
+            compact ? "mt-0 text-[20px] leading-[24px]" : "mt-2 text-[60px] leading-[60px]",
+          )}
           style={{ textRendering: "geometricPrecision" }}
         >
           {heroTitle.replace(targetLabel, "").trim()} {targetLabel}
@@ -1132,7 +1163,14 @@ function Inner({ host }: { host: string }) {
         ) : null}
 
         <Box id="block-visibility-metrics" title="Visibility" style={boxStyles}>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div
+            className={cn(
+              "grid",
+              compact
+                ? "grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7"
+                : "grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4",
+            )}
+          >
             {visibilityMetrics.map((metric) => (
               <VisualStatCard
                 key={metric.title}
@@ -1487,6 +1525,7 @@ function Inner({ host }: { host: string }) {
         <Footer src="/eidra-logo.svg" />
       </div>
     </div>
+    </CompactContext.Provider>
   );
 }
 
@@ -1848,45 +1887,69 @@ function VisualStatCard({
     accent: "#DA7C60",
   }[tone];
   const pct = progress == null ? null : Math.max(0, Math.min(100, progress));
+  const compact = useCompact();
   return (
-    <div className="relative overflow-hidden rounded-md border border-black/5 bg-white px-5 py-5">
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-md border border-black/5 bg-white",
+        compact ? "px-3 py-2" : "px-5 py-5",
+      )}
+    >
       <span
         aria-hidden
         className="absolute left-0 top-0 h-full w-1"
         style={{ background: toneColor }}
       />
-      <div className="flex items-start justify-between gap-3">
-        <p className="eidra-sans text-[12px] font-bold uppercase tracking-[0.08em] text-black/55">
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className={cn(
+            "eidra-sans font-bold uppercase tracking-[0.08em] text-black/55",
+            compact ? "text-[10px]" : "text-[12px]",
+          )}
+        >
           {title}
         </p>
-        {icon ? (
+        {icon && !compact ? (
           <span className="text-black/35" aria-hidden>
             {icon}
           </span>
         ) : null}
       </div>
-      <div className="mt-2 flex items-baseline gap-2">
+      <div className={cn("flex items-baseline gap-2", compact ? "mt-0.5" : "mt-2")}>
         <p
-          className="eidra-sans text-[42px] font-bold leading-[44px] tabular-nums tracking-tight"
+          className={cn(
+            "eidra-sans font-bold tabular-nums tracking-tight",
+            compact ? "text-[20px] leading-[22px]" : "text-[42px] leading-[44px]",
+          )}
           style={{ color: toneColor, textRendering: "geometricPrecision" }}
         >
           {value}
         </p>
         {caption ? (
-          <span className="eidra-sans text-[13px] font-bold text-black/35 tabular-nums">
+          <span
+            className={cn(
+              "eidra-sans font-bold text-black/35 tabular-nums",
+              compact ? "text-[10px]" : "text-[13px]",
+            )}
+          >
             {caption}
           </span>
         ) : null}
       </div>
       {pct != null ? (
-        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
+        <div
+          className={cn(
+            "w-full overflow-hidden rounded-full bg-black/[0.06]",
+            compact ? "mt-1.5 h-1" : "mt-3 h-1.5",
+          )}
+        >
           <div
             className="h-full rounded-full transition-[width] duration-500 ease-out"
             style={{ width: `${pct}%`, background: toneColor }}
           />
         </div>
       ) : null}
-      {detail ? (
+      {detail && !compact ? (
         <p className="pp-neue-montreal mt-3 text-xs font-medium text-black/45">{detail}</p>
       ) : null}
     </div>
@@ -1990,9 +2053,17 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
   const maxCamRac = Math.max(1, ...cameras.map((c) => c.rac));
   const maxCamUnique = Math.max(1, ...cameras.map((c) => c.unique_persons));
 
+  const compact = useCompact();
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className={compact ? "space-y-2" : "space-y-4"}>
+      <div
+        className={cn(
+          "grid",
+          compact
+            ? "grid-cols-2 gap-1.5 md:grid-cols-4"
+            : "grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4",
+        )}
+      >
         <VisualStatCard
           title="Audience confidence"
           value={`${formatMetricNumber(confidence, 1)}%`}
@@ -2152,25 +2223,41 @@ function AngleAward({
     bad: "#ef4444",
     accent: "#DA7C60",
   }[tone];
+  const compact = useCompact();
   return (
-    <div className="relative overflow-hidden rounded-md border border-black/5 bg-white px-5 py-5">
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-md border border-black/5 bg-white",
+        compact ? "px-3 py-2" : "px-5 py-5",
+      )}
+    >
       <span
         aria-hidden
         className="absolute left-0 top-0 h-full w-1"
         style={{ background: toneColor }}
       />
-      <p className="eidra-sans text-[12px] font-bold uppercase tracking-[0.08em] text-black/55">
+      <p
+        className={cn(
+          "eidra-sans font-bold uppercase tracking-[0.08em] text-black/55",
+          compact ? "text-[10px]" : "text-[12px]",
+        )}
+      >
         Best {label}
       </p>
       <p
-        className="eidra-sans mt-2 text-[42px] font-bold leading-[44px] tabular-nums tracking-tight"
+        className={cn(
+          "eidra-sans font-bold tabular-nums tracking-tight",
+          compact ? "mt-0.5 text-[20px] leading-[22px]" : "mt-2 text-[42px] leading-[44px]",
+        )}
         style={{ color: toneColor, textRendering: "geometricPrecision" }}
       >
         {formatMetricNumber(camera?.[metric] ?? 0)}
       </p>
-      <p className="pp-neue-montreal mt-2 truncate font-mono text-xs font-medium text-black/45">
-        {camera?.camera_id ?? "—"}
-      </p>
+      {!compact ? (
+        <p className="pp-neue-montreal mt-2 truncate font-mono text-xs font-medium text-black/45">
+          {camera?.camera_id ?? "—"}
+        </p>
+      ) : null}
     </div>
   );
 }
