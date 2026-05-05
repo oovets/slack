@@ -11,6 +11,7 @@ import { Box } from "@/components/ui/box";
 import { ControlPanel } from "@/components/ui/control-panel/control-panel";
 import { Footer } from "@/components/ui/footer";
 import { Header } from "@/components/ui/header";
+import { ResponsiveScale } from "@/components/ui/responsive-scale";
 import {
   ageGroupsData,
   contactsByGenderData,
