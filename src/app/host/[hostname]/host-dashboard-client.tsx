@@ -1167,8 +1167,8 @@ function Inner({ host }: { host: string }) {
             className={cn(
               "grid",
               compact
-                ? "grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7"
-                : "grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4",
+                ? "grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7"
+                : "grid-cols-2 gap-x-6 gap-y-6 md:grid-cols-3 xl:grid-cols-4",
             )}
           >
             {visibilityMetrics.map((metric) => (
@@ -1177,9 +1177,7 @@ function Inner({ host }: { host: string }) {
                 title={metric.title}
                 value={metric.value}
                 detail={metric.detail}
-                progress={metric.progress}
                 caption={metric.caption}
-                tone={metric.tone}
               />
             ))}
           </div>
