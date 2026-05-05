@@ -3018,7 +3018,7 @@ function TimeRangePicker({
               {customActive && customLabel ? customLabel : "Custom"}
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
+          <PopoverContent className="w-auto p-0 bg-[#F5F2ED] border border-black/10 shadow-lg" align="end">
             <Calendar
               mode="range"
               selected={customRange}
