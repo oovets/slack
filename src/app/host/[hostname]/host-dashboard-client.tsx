@@ -2223,7 +2223,7 @@ function CameraBar({
           )}
           style={{ textRendering: "geometricPrecision" }}
         >
-          {formatMetricNumber(value)}
+          <SlidingNumber animateOnLoad={false} number={value} decimalSeparator="," />
         </span>
       </div>
       <div className={cn("mt-1 w-full overflow-hidden rounded-full bg-black/[0.06]", compact ? "h-1" : "h-1.5")}>
