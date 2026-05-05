@@ -1091,7 +1091,16 @@ function Inner({ host }: { host: string }) {
             <TimeRangePicker
               ranges={timeRanges}
               activeKey={timeRangeKey}
-              onChange={setTimeRangeKey}
+              onChange={(k) => {
+                setTimeRangeKey(k);
+                if (k !== "custom") setCustomRange(undefined);
+              }}
+              customRange={customRange}
+              onCustomRangeChange={(r) => {
+                setCustomRange(r);
+                if (r?.from) setTimeRangeKey("custom");
+              }}
+              customLabel={timeRangeKey === "custom" ? timeRange.label : undefined}
             />
             <span
               className={cn(toolbarPillClass, "tabular-nums text-black/60")}
