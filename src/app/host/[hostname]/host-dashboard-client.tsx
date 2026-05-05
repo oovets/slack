@@ -1979,94 +1979,156 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
     (a, b) => b.total_detections - a.total_detections,
   );
 
+  const confidence = insight.confidence_score ?? 0;
+  const confidenceTone: "positive" | "warn" | "bad" =
+    confidence >= 75 ? "positive" : confidence >= 45 ? "warn" : "bad";
+  const angleAgreement = insight.angle_agreement_pct ?? 0;
+  const synced = insight.synced_bucket_pct ?? 0;
+  const rawSum = insight.raw_camera_unique_sum ?? 0;
+  const dedupePct = rawSum > 0 ? ((insight.double_count_prevented ?? 0) / rawSum) * 100 : 0;
+  const maxCamDetections = Math.max(1, ...cameras.map((c) => c.total_detections));
+  const maxCamRac = Math.max(1, ...cameras.map((c) => c.rac));
+  const maxCamUnique = Math.max(1, ...cameras.map((c) => c.unique_persons));
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <InsightCard
+        <VisualStatCard
           title="Audience confidence"
-          value={`${formatMetricNumber(insight.confidence_score ?? 0, 1)}%`}
+          value={`${formatMetricNumber(confidence, 1)}%`}
           detail="Overlap, detection balance and RAC balance"
+          progress={confidence}
+          tone={confidenceTone}
         />
-        <InsightCard
+        <VisualStatCard
           title="Angle agreement"
-          value={`${formatMetricNumber(insight.angle_agreement_pct ?? 0, 1)}%`}
+          value={`${formatMetricNumber(angleAgreement, 1)}%`}
           detail={`${formatMetricNumber(insight.confirmed_by_multiple_angles ?? 0)} confirmed by multiple angles`}
+          progress={angleAgreement}
+          tone="accent"
         />
-        <InsightCard
+        <VisualStatCard
           title="Double-count prevented"
           value={formatMetricNumber(insight.double_count_prevented ?? 0)}
-          detail={`${formatMetricNumber(insight.raw_camera_unique_sum ?? 0)} raw camera contacts`}
+          caption={rawSum ? `/ ${formatMetricNumber(rawSum)}` : undefined}
+          detail="Raw camera contacts deduplicated"
+          progress={dedupePct}
+          tone="positive"
         />
-        <InsightCard
+        <VisualStatCard
           title="Synced activity"
-          value={`${formatMetricNumber(insight.synced_bucket_pct ?? 0, 1)}%`}
+          value={`${formatMetricNumber(synced, 1)}%`}
           detail={`${formatMetricNumber(insight.synced_bucket_count ?? 0)} / ${formatMetricNumber(insight.active_bucket_count ?? 0)} active buckets`}
+          progress={synced}
+          tone="neutral"
         />
       </div>
 
-      <div className="space-y-4">
-        <div className="rounded-md border border-black/5 bg-white px-5 py-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="pp-neue-montreal text-[13px] font-bold text-black">
-                Cross-angle dedupe
-              </p>
-              <p className="pp-neue-montreal mt-1 text-xs font-medium text-black/45">
-                Deduped audience: {formatMetricNumber(insight.deduped_audience ?? 0)} · single-angle only: {formatMetricNumber(insight.single_angle_only ?? 0)}
-              </p>
-            </div>
-            <div className="rounded-full bg-black px-3 py-1 text-[11px] font-bold text-white">
-              {formatMetricNumber(insight.camera_count)} cams
-            </div>
+      <div className="rounded-md border border-black/5 bg-white px-5 py-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="eidra-sans text-[13px] font-bold tracking-tight text-black">
+              Cross-angle dedupe
+            </p>
+            <p className="pp-neue-montreal mt-1 text-xs font-medium text-black/45">
+              Deduped audience: {formatMetricNumber(insight.deduped_audience ?? 0)} · single-angle only: {formatMetricNumber(insight.single_angle_only ?? 0)}
+            </p>
           </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {cameras.flatMap((camera) => [
-              <DualCameraKpiCard
-                key={`${camera.camera_id}-total`}
-                title="Total detections"
-                value={formatMetricNumber(camera.total_detections)}
-                detail={camera.camera_id}
-              />,
-              <DualCameraKpiCard
-                key={`${camera.camera_id}-rac`}
-                title="RAC"
-                value={formatMetricNumber(camera.rac)}
-                detail={camera.camera_id}
-              />,
-              <DualCameraKpiCard
-                key={`${camera.camera_id}-unique`}
-                title="Unique contacts"
-                value={formatMetricNumber(camera.unique_persons)}
-                detail={camera.camera_id}
-              />,
-              <DualCameraKpiCard
-                key={`${camera.camera_id}-looked`}
-                title="Looked at screen"
-                value={`${formatMetricNumber(camera.looked_pct, 1)}%`}
-                detail={camera.camera_id}
-              />,
-            ])}
+          <div className="eidra-sans rounded-full bg-black px-3 py-1 text-[11px] font-bold tracking-tight text-white">
+            {formatMetricNumber(insight.camera_count)} cams
           </div>
         </div>
 
-        <div className="rounded-md border border-black/5 bg-white px-5 py-5">
-          <p className="pp-neue-montreal mb-4 text-[13px] font-bold text-black">Best angles</p>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <AngleAward label="Detection" camera={insight.best_detection_camera} metric="total_detections" />
-            <AngleAward label="Attention" camera={insight.best_attention_camera} metric="rac" />
-            <AngleAward label="Demographics" camera={insight.best_demographics_camera} metric="demographics_count" />
-          </div>
-          {confirmedReach.length >= 2 ? (
-            <div className="mt-5">
-              <div className="mb-2 flex justify-between text-[11px] font-medium uppercase tracking-[0.12em] text-black/35">
-                <span>Confirmed reach over time</span>
-                <span>peak {formatMetricNumber(Math.max(...confirmedReach, 0))}</span>
+        <div className="space-y-3">
+          {cameras.map((camera) => (
+            <div
+              key={camera.camera_id}
+              className="rounded-md border border-black/5 bg-[#fbfbf9] px-4 py-3"
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="eidra-sans truncate text-[13px] font-bold tracking-tight text-black">
+                  {camera.camera_id}
+                </span>
+                <span className="pp-neue-montreal text-[11px] font-medium text-black/45 tabular-nums">
+                  {formatMetricNumber(camera.looked_pct, 1)}% looked
+                </span>
               </div>
-              <Sparkline data={confirmedReach} stroke="#316a53" />
+              <div className="grid grid-cols-3 gap-3">
+                <CameraBar
+                  label="Detections"
+                  value={camera.total_detections}
+                  max={maxCamDetections}
+                  color="#1f1f1f"
+                />
+                <CameraBar
+                  label="RAC"
+                  value={camera.rac}
+                  max={maxCamRac}
+                  color="#DA7C60"
+                />
+                <CameraBar
+                  label="Unique"
+                  value={camera.unique_persons}
+                  max={maxCamUnique}
+                  color="#10b981"
+                />
+              </div>
             </div>
-          ) : null}
+          ))}
         </div>
+      </div>
+
+      <div className="rounded-md border border-black/5 bg-white px-5 py-5">
+        <p className="eidra-sans mb-4 text-[13px] font-bold tracking-tight text-black">Best angles</p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <AngleAward label="Detection" camera={insight.best_detection_camera} metric="total_detections" tone="neutral" />
+          <AngleAward label="Attention" camera={insight.best_attention_camera} metric="rac" tone="accent" />
+          <AngleAward label="Demographics" camera={insight.best_demographics_camera} metric="demographics_count" tone="positive" />
+        </div>
+        {confirmedReach.length >= 2 ? (
+          <div className="mt-5">
+            <div className="mb-2 flex justify-between text-[11px] font-medium uppercase tracking-[0.12em] text-black/35">
+              <span>Confirmed reach over time</span>
+              <span>peak {formatMetricNumber(Math.max(...confirmedReach, 0))}</span>
+            </div>
+            <Sparkline data={confirmedReach} stroke="#316a53" />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CameraBar({
+  label,
+  value,
+  max,
+  color,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  color: string;
+}) {
+  const pct = max > 0 ? Math.max(2, Math.min(100, (value / max) * 100)) : 0;
+  return (
+    <div>
+      <div className="mb-1 flex items-baseline justify-between gap-1">
+        <span className="eidra-sans text-[10px] font-bold uppercase tracking-[0.08em] text-black/45">
+          {label}
+        </span>
+        <span
+          className="eidra-sans text-[14px] font-bold tabular-nums tracking-tight"
+          style={{ color }}
+        >
+          {formatMetricNumber(value)}
+        </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/[0.06]">
+        <div
+          className="h-full rounded-full transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%`, background: color }}
+        />
       </div>
     </div>
   );
