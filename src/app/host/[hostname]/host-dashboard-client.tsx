@@ -1169,18 +1169,21 @@ function Inner({ host }: { host: string }) {
                 label="Inserts / sec"
                 value={hostInsertsPerSec}
                 decimals={2}
+                variant="compact"
               />
               <KpiTile
                 icon={<Database className="h-9 w-9 text-white" />}
                 label="Inserts / min"
                 value={hostInsertsPerMin}
                 decimals={0}
+                variant="compact"
               />
               <KpiTile
                 icon={<Activity className="h-9 w-9 text-white" />}
                 label="Last minute"
                 value={analyticsLastMinute}
                 postfix=" /min"
+                variant="compact"
               />
               <KpiTile
                 icon={<Activity className="h-9 w-9 text-white" />}
@@ -1188,18 +1191,21 @@ function Inner({ host }: { host: string }) {
                 value={analyticsHistoryAverage}
                 decimals={1}
                 postfix=" /min"
+                variant="compact"
               />
               <KpiTile
                 icon={<ArrowDown className="h-9 w-9 text-white" />}
                 label="RX Mbps"
                 value={network?.rx_mbps ?? null}
                 decimals={2}
+                variant="compact"
               />
               <KpiTile
                 icon={<ArrowUp className="h-9 w-9 text-white" />}
                 label="TX Mbps"
                 value={network?.tx_mbps ?? null}
                 decimals={2}
+                variant="compact"
               />
             </div>
           </Box>
@@ -2711,6 +2717,7 @@ function KpiTile({
   postfix,
   decimals = 0,
   thresholds,
+  variant = "default",
 }: {
   icon: React.ReactNode;
   label: string;
@@ -2718,6 +2725,7 @@ function KpiTile({
   postfix?: string;
   decimals?: number;
   thresholds?: [warn: number, crit: number];
+  variant?: "default" | "compact";
 }) {
   let color = "#000000";
   let tileBg = "linear-gradient(135deg, #63A8A5 0%, #DA7C60 100%)";
@@ -2734,6 +2742,42 @@ function KpiTile({
     value != null && !isNaN(value)
       ? Number(value.toFixed(decimals))
       : null;
+  if (variant === "compact") {
+    return (
+      <div className="flex min-w-0 flex-col gap-2 p-2">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-md transition-colors [&_svg]:h-6 [&_svg]:w-6"
+            style={{ background: tileBg }}
+          >
+            {icon}
+          </div>
+          <h2
+            className="eidra-sans min-w-0 text-[12px] font-medium leading-[13px] text-black"
+            style={{ textRendering: "geometricPrecision" }}
+          >
+            {label}
+          </h2>
+        </div>
+        <h1
+          className="eidra-sans flex min-w-0 items-baseline text-[31px] font-bold leading-[32px] tabular-nums"
+          style={{ textRendering: "geometricPrecision", color }}
+        >
+          {displayValue == null ? (
+            <span className="text-black/30">—</span>
+          ) : (
+            <SlidingNumber
+              animateOnLoad={false}
+              decimalPlaces={decimals}
+              number={displayValue}
+              decimalSeparator=","
+              postfix={postfix}
+            />
+          )}
+        </h1>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-row p-2">
       <div
