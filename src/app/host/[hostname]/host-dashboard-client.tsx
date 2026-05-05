@@ -2053,9 +2053,17 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
   const maxCamRac = Math.max(1, ...cameras.map((c) => c.rac));
   const maxCamUnique = Math.max(1, ...cameras.map((c) => c.unique_persons));
 
+  const compact = useCompact();
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className={compact ? "space-y-2" : "space-y-4"}>
+      <div
+        className={cn(
+          "grid",
+          compact
+            ? "grid-cols-2 gap-1.5 md:grid-cols-4"
+            : "grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4",
+        )}
+      >
         <VisualStatCard
           title="Audience confidence"
           value={`${formatMetricNumber(confidence, 1)}%`}
