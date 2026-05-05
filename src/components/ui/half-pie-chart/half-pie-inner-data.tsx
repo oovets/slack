@@ -23,10 +23,10 @@ export function HalfPieInnerData({
   return (
     <div className={wrapperClassName}>
       <div className="flex flex-col flex-1 items-center">
-        <h1 className="eidra-sans font-bold text-[90px] text-black" style={{
+        <h1 className="eidra-sans font-bold text-[90px] text-black tabular-nums" style={{
           textRendering: 'geometricPrecision',
         }}>
-          <SlidingNumber animateOnLoad={true} number={leftValue} />
+          <SlidingNumber animateOnLoad={true} delay={500} number={leftValue} />
         </h1>
         <h1 className="eidra-sans font-medium text-[20px] text-black/30 mt-3" style={{
           textRendering: 'geometricPrecision',
@@ -40,10 +40,10 @@ export function HalfPieInnerData({
         <span className="border border-black/30 -translate-x-1/2 border-s-transparent border-y-transparent h-[66px]" />
       </div>
       <div className="flex flex-col flex-1 items-center">
-        <h1 className="eidra-sans font-bold text-[90px] text-black" style={{
+        <h1 className="eidra-sans font-bold text-[90px] text-black tabular-nums" style={{
           textRendering: 'geometricPrecision',
         }}>
-          <SlidingNumber animateOnLoad={true} number={rightValue} />
+          <SlidingNumber animateOnLoad={true} delay={500} number={rightValue} />
         </h1>
         <h1 className="eidra-sans font-medium text-[20px] text-black/30 mt-3" style={{
           textRendering: 'geometricPrecision',

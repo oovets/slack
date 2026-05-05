@@ -29,7 +29,7 @@ export function HalfPieChart({ values, layout = "portrait" }: HalfPieChartProps)
   useEffect(() => {
     const timer = setTimeout(() => {
       setDelayPassed(true);
-    }, 2250);
+    }, 500);
     return () => clearTimeout(timer);
   }, []);
 

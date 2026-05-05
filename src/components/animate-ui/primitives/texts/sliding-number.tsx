@@ -134,7 +134,7 @@ function SlidingNumber({
   prefix,
   postfix,
   thousandsSeparator = ",",
-  delay = 3000,
+  delay = 600,
   ...props
 }: SlidingNumberProps) {
   const localRef = React.useRef<HTMLSpanElement>(null);

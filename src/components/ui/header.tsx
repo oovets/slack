@@ -11,12 +11,15 @@ export function Header({ campaignName, ...rest }: HeaderProps) {
     >
       <h1
         id="dashboard-header-title"
-        className="eidra-sans pointer-events-auto absolute left-1/2 top-1/2 w-full max-w-[min(100%,1000px)] -translate-x-1/2 -translate-y-1/2 text-center text-[60px] font-bold leading-[60px]"
+        className="eidra-sans pointer-events-auto absolute left-1/2 top-1/2 w-full max-w-[min(100%,1000px)] -translate-x-1/2 -translate-y-1/2 text-center text-[60px] leading-[60px]"
         style={{
           textRendering: "geometricPrecision",
         }}
       >
-        Live metrics from {campaignName?.trim() ? campaignName : "booth"}
+        <span className="font-medium text-black/60">Live metrics from </span>
+        <span className="font-bold text-black">
+          {campaignName?.trim() ? campaignName : "booth"}
+        </span>
       </h1>
     </header>
   );

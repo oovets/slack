@@ -11,6 +11,7 @@ import { Box } from "@/components/ui/box";
 import { ControlPanel } from "@/components/ui/control-panel/control-panel";
 import { Footer } from "@/components/ui/footer";
 import { Header } from "@/components/ui/header";
+import { ResponsiveScale } from "@/components/ui/responsive-scale";
 import {
   ageGroupsData,
   contactsByGenderData,
@@ -266,7 +267,7 @@ function HomeContent({ campaignId, isAdmin }: { campaignId: string; isAdmin: boo
   const campaignTitle = campaignMetrics?.campaign?.name?.trim() || "booth";
 
   if (isLandscape) {
-    return (
+    const landscapeContent = (
       <div className="relative mx-auto flex h-[1080px] min-h-[1080px] w-[1920px] min-w-[1920px] max-w-[1920px] overflow-hidden bg-[#fbfbf9]">
         <div
           id="dashboard-main"
@@ -285,10 +286,11 @@ function HomeContent({ campaignId, isAdmin }: { campaignId: string; isAdmin: boo
             />
             <h1
               id="dashboard-header-title"
-              className="eidra-sans pointer-events-auto absolute left-1/2 top-1/2 w-full max-w-[min(100%,1600px)] -translate-x-1/2 -translate-y-1/2 text-center text-[60px] font-bold leading-[60px] text-black"
+              className="eidra-sans pointer-events-auto absolute left-1/2 top-1/2 w-full max-w-[min(100%,1600px)] -translate-x-1/2 -translate-y-1/2 text-center text-[52px] leading-[60px] text-black"
               style={{ textRendering: "geometricPrecision" }}
             >
-              Live metrics from {campaignTitle}
+              <span className="font-medium text-black/60">Live metrics from </span>
+              <span className="font-bold">{campaignTitle}</span>
             </h1>
             <div className="absolute right-0 top-1/2 z-10 flex -translate-y-1/2 items-center">
               {/* Campaign logo URLs are dynamic — next/image remotePatterns would be noisy */}
@@ -390,10 +392,16 @@ function HomeContent({ campaignId, isAdmin }: { campaignId: string; isAdmin: boo
         )}
       </div>
     );
+
+    return (
+      <ResponsiveScale width={1920} height={1080} background="#fbfbf9">
+        {landscapeContent}
+      </ResponsiveScale>
+    );
   }
 
-  return (
-    <div className="relative flex h-[1920px] min-h-[1920px] w-full overflow-hidden">
+  const portraitContent = (
+    <div className="relative flex h-[1920px] min-h-[1920px] w-[1080px] overflow-hidden">
       {/* Rotated background image - clipped to 1080x1920 */}
       <div className="absolute inset-0 z-0 flex items-center justify-center" aria-hidden>
         <div
@@ -541,6 +549,12 @@ function HomeContent({ campaignId, isAdmin }: { campaignId: string; isAdmin: boo
         </aside>
       )}
     </div>
+  );
+
+  return (
+    <ResponsiveScale width={1080} height={1920} background="#000">
+      {portraitContent}
+    </ResponsiveScale>
   );
 }
 
