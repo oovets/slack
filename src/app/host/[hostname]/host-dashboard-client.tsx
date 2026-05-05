@@ -2113,9 +2113,9 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
                 </span>
               </div>
               <div className={cn("grid grid-cols-3", compact ? "gap-3" : "gap-6")}>
-                <CameraBar label="Detections" value={camera.total_detections} max={maxCamDetections} />
-                <CameraBar label="RAC" value={camera.rac} max={maxCamRac} />
-                <CameraBar label="Unique" value={camera.unique_persons} max={maxCamUnique} />
+                <CameraBar label="Detections" value={camera.total_detections} max={maxCamDetections} color="#316a53" />
+                <CameraBar label="RAC" value={camera.rac} max={maxCamRac} color="#DA7C60" />
+                <CameraBar label="Unique" value={camera.unique_persons} max={maxCamUnique} color="#63A8A5" />
               </div>
             </div>
           ))}
