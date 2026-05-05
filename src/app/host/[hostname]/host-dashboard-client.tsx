@@ -1860,97 +1860,63 @@ function InsightCard({
  * optional progress fill. Used by Visibility and Dual-camera grids so values
  * read at a glance without parsing rows of text.
  */
+/**
+ * VisualStatCard — matches the dashboard's MetricItem typography (eidra-sans
+ * medium label + huge bold number) so Visibility / Dual-camera grids look
+ * native to the rest of the dashboard. No borders, no accent strips, no
+ * uppercase tracking — just the same type system every other Box uses.
+ */
 function VisualStatCard({
   title,
   value,
   detail,
-  /** 0–100. Drives the progress bar fill. */
-  progress,
-  /** Optional secondary number on the right (e.g. peer total). */
   caption,
-  tone = "neutral",
-  icon,
 }: {
   title: string;
   value: string;
   detail?: string;
-  progress?: number;
+  /** Optional secondary number displayed inline (e.g. peer total). */
   caption?: string;
+  /** Kept for API compatibility — ignored visually. */
+  progress?: number;
   tone?: "neutral" | "positive" | "warn" | "bad" | "accent";
   icon?: React.ReactNode;
 }) {
-  const toneColor = {
-    neutral: "#1f1f1f",
-    positive: "#10b981",
-    warn: "#f59e0b",
-    bad: "#ef4444",
-    accent: "#DA7C60",
-  }[tone];
-  const pct = progress == null ? null : Math.max(0, Math.min(100, progress));
   const compact = useCompact();
   return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-md border border-black/5 bg-white",
-        compact ? "px-3 py-2" : "px-5 py-5",
-      )}
-    >
-      <span
-        aria-hidden
-        className="absolute left-0 top-0 h-full w-1"
-        style={{ background: toneColor }}
-      />
-      <div className="flex items-start justify-between gap-2">
-        <p
-          className={cn(
-            "eidra-sans font-bold uppercase tracking-[0.08em] text-black/55",
-            compact ? "text-[10px]" : "text-[12px]",
-          )}
-        >
-          {title}
-        </p>
-        {icon && !compact ? (
-          <span className="text-black/35" aria-hidden>
-            {icon}
-          </span>
-        ) : null}
-      </div>
-      <div className={cn("flex items-baseline gap-2", compact ? "mt-0.5" : "mt-2")}>
-        <p
-          className={cn(
-            "eidra-sans font-bold tabular-nums tracking-tight",
-            compact ? "text-[20px] leading-[22px]" : "text-[42px] leading-[44px]",
-          )}
-          style={{ color: toneColor, textRendering: "geometricPrecision" }}
-        >
-          {value}
-        </p>
+    <div className={cn("flex flex-col", compact ? "p-2" : "p-2")}>
+      <h2
+        className={cn(
+          "eidra-sans whitespace-nowrap font-medium text-black",
+          compact ? "text-[12px]" : "text-[15px]",
+        )}
+        style={{ textRendering: "geometricPrecision" }}
+      >
+        {title}
+      </h2>
+      <h1
+        className={cn(
+          "eidra-sans -ml-[2px] flex items-baseline font-bold tabular-nums text-black",
+          compact ? "text-[22px] leading-[24px]" : "text-[57px] leading-[60px]",
+        )}
+        style={{ textRendering: "geometricPrecision" }}
+      >
+        {value}
         {caption ? (
           <span
             className={cn(
-              "eidra-sans font-bold text-black/35 tabular-nums",
-              compact ? "text-[10px]" : "text-[13px]",
+              "eidra-sans ml-1.5 font-medium text-black/35",
+              compact ? "text-[10px]" : "text-[14px]",
             )}
           >
             {caption}
           </span>
         ) : null}
-      </div>
-      {pct != null ? (
-        <div
-          className={cn(
-            "w-full overflow-hidden rounded-full bg-black/[0.06]",
-            compact ? "mt-1.5 h-1" : "mt-3 h-1.5",
-          )}
-        >
-          <div
-            className="h-full rounded-full transition-[width] duration-500 ease-out"
-            style={{ width: `${pct}%`, background: toneColor }}
-          />
-        </div>
-      ) : null}
+      </h1>
       {detail && !compact ? (
-        <p className="pp-neue-montreal mt-3 text-xs font-medium text-black/45">{detail}</p>
+        <p className="pp-neue-montreal mt-1 text-[12px] font-medium text-black/50">
+          {detail}
+        </p>
       ) : null}
     </div>
   );
