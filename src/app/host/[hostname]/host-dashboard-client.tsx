@@ -435,6 +435,14 @@ function Inner({ host }: { host: string }) {
   const [paused, setPaused] = useState(false);
   const [tick, setTick] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
+  const [compact, setCompact] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("host-dashboard-compact") === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("host-dashboard-compact", compact ? "1" : "0");
+  }, [compact]);
   const [timeRangeKey, setTimeRangeKey] = useState<TimeRangeKey>("today");
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>("vision");
   const [uptimeWindow, setUptimeWindow] = useState<UptimeWindow>("24h");
