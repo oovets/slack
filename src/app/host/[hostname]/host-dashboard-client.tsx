@@ -2058,23 +2058,29 @@ function DualCameraInsightPanel({ insight }: { insight?: DualCameraInsight }) {
       >
         <VisualStatCard
           title="Audience confidence"
-          value={`${formatMetricNumber(confidence, 1)}%`}
+          number={confidence}
+          postfix="%"
+          decimals={1}
           detail="Overlap, detection balance, RAC balance"
         />
         <VisualStatCard
           title="Angle agreement"
-          value={`${formatMetricNumber(angleAgreement, 1)}%`}
+          number={angleAgreement}
+          postfix="%"
+          decimals={1}
           detail={`${formatMetricNumber(insight.confirmed_by_multiple_angles ?? 0)} confirmed by multiple angles`}
         />
         <VisualStatCard
           title="Double-count prevented"
-          value={formatMetricNumber(insight.double_count_prevented ?? 0)}
+          number={insight.double_count_prevented ?? 0}
           caption={rawSum ? `/ ${formatMetricNumber(rawSum)}` : undefined}
           detail="Raw camera contacts deduplicated"
         />
         <VisualStatCard
           title="Synced activity"
-          value={`${formatMetricNumber(synced, 1)}%`}
+          number={synced}
+          postfix="%"
+          decimals={1}
           detail={`${formatMetricNumber(insight.synced_bucket_count ?? 0)} / ${formatMetricNumber(insight.active_bucket_count ?? 0)} active buckets`}
         />
       </div>
