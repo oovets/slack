@@ -15,7 +15,6 @@ import {
   ArrowUp,
   Camera,
   ChevronDown,
-  ChevronUp,
   Clock,
   Cpu,
   Database,
