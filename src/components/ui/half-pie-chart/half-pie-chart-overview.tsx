@@ -21,7 +21,7 @@ export function HalfPieChartOverview({
         }}>
           <SlidingNumber
             animateOnLoad={false}
-            delay={3000}
+            delay={500}
             number={contactsByGender.left.number}
           />
         </h3>
@@ -37,7 +37,7 @@ export function HalfPieChartOverview({
         }}>
           <SlidingNumber
             animateOnLoad={false}
-            delay={3000}
+            delay={500}
             number={contactsByGender.right.number}
           />
         </h3>

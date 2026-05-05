@@ -11,6 +11,7 @@ export function AgeGroupsSection({ ageGroups }: AgeGroupsSectionProps) {
       {ageGroups.map((ageGroup, idx) => (
         <PercentageGroup
           key={idx}
+          index={idx}
           visible={ageGroup.visible}
           title={ageGroup.name}
           groupAmount={ageGroup.amount}
