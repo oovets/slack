@@ -1590,8 +1590,12 @@ function CollapsibleBox({
   return (
     <div
       id={id}
-      className={cn("relative overflow-hidden px-[28px] py-[40px]", className)}
-      style={style}
+      className={cn(
+        "relative overflow-hidden",
+        title ? "px-[28px] py-[40px]" : "px-0 py-0",
+        className,
+      )}
+      style={title ? style : undefined}
     >
       <button
         type="button"
