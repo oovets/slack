@@ -1201,40 +1201,115 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 		}, func(f api.File) {
 			a.openMediaDialog(f)
 		}, func(m api.Message, reaction string) {
-			a.addReactionToMessage(p, m, reaction)
+			a.toggleReactionOnMessage(p, m, reaction)
 		}, a.client.FetchPrivateURL)
 		a.schedulePaneScrollToBottom(p)
 	})
 }
 
-func (a *App) addReactionToMessage(p *chatPane, m api.Message, reaction string) {
+// toggleReactionOnMessage applies an optimistic local update to the chip
+// row immediately, then syncs with Slack in the background. If the API
+// call fails the local state is reverted so the UI stays consistent.
+func (a *App) toggleReactionOnMessage(p *chatPane, m api.Message, reaction string) {
 	if p == nil || a.client == nil {
 		return
 	}
 	channelID := strings.TrimSpace(p.channelID)
 	ts := strings.TrimSpace(m.TS)
 	name := strings.Trim(strings.TrimSpace(reaction), ":")
+	selfID := strings.TrimSpace(a.info.UserID)
 	if channelID == "" || ts == "" || name == "" {
 		return
 	}
+
+	// Use the freshest copy of the message that the pane is showing so we
+	// don't clobber concurrent updates (e.g. another user reacted).
+	current, ok := p.messageByTS(ts)
+	if !ok {
+		current = m
+	}
+	prev := cloneReactions(current.Reactions)
+	next, adding := toggleReactionLocal(prev, name, selfID)
+	p.applyLocalReactions(ts, next)
+
 	go func() {
-		err := a.client.AddReaction(channelID, ts, name)
+		var err error
+		if adding {
+			err = a.client.AddReaction(channelID, ts, name)
+		} else {
+			err = a.client.RemoveReaction(channelID, ts, name)
+		}
 		fyne.Do(func() {
-			if err != nil {
-				if strings.Contains(err.Error(), "already_reacted") {
-					a.setStatusTemporary("Reaction already added", 2*time.Second)
-					return
-				}
-				a.setStatusWithAction("Reaction failed", "Retry", func() {
-					a.addReactionToMessage(p, m, reaction)
-				})
-				dialog.ShowError(err, a.win)
+			if err == nil {
 				return
 			}
-			a.setStatusTemporary("Reaction added", 2*time.Second)
-			go a.loadMessagesForPane(p)
+			msg := err.Error()
+			// Slack returns these when our optimistic guess was wrong
+			// (someone else's state changed in the meantime). Treat as
+			// success — the chip already reflects the intent.
+			if strings.Contains(msg, "already_reacted") || strings.Contains(msg, "no_reaction") {
+				return
+			}
+			// Real failure: revert and surface the error.
+			p.applyLocalReactions(ts, prev)
+			a.setStatusWithAction("Reaction failed", "Retry", func() {
+				a.toggleReactionOnMessage(p, m, reaction)
+			})
+			dialog.ShowError(err, a.win)
 		})
 	}()
+}
+
+// toggleReactionLocal returns a new reactions slice with the given emoji
+// either added (if the user hadn't reacted with it) or removed (if they
+// had). The second return value reports which direction we went.
+func toggleReactionLocal(prev []api.Reaction, name, selfID string) ([]api.Reaction, bool) {
+	name = strings.Trim(strings.TrimSpace(name), ":")
+	out := make([]api.Reaction, 0, len(prev)+1)
+	found := false
+	adding := true
+	for _, r := range prev {
+		if r.Name != name {
+			out = append(out, r)
+			continue
+		}
+		found = true
+		self := false
+		users := make([]string, 0, len(r.Users))
+		for _, u := range r.Users {
+			if strings.TrimSpace(u) == selfID && selfID != "" {
+				self = true
+				continue
+			}
+			users = append(users, u)
+		}
+		if self {
+			// Removing our reaction.
+			adding = false
+			if r.Count <= 1 {
+				continue // drop the reaction entirely
+			}
+			out = append(out, api.Reaction{Name: r.Name, Count: r.Count - 1, Users: users})
+		} else {
+			// Adding our reaction.
+			users = append(users, selfID)
+			out = append(out, api.Reaction{Name: r.Name, Count: r.Count + 1, Users: users})
+		}
+	}
+	if !found {
+		out = append(out, api.Reaction{Name: name, Count: 1, Users: []string{selfID}})
+	}
+	return out, adding
+}
+
+func cloneReactions(in []api.Reaction) []api.Reaction {
+	out := make([]api.Reaction, len(in))
+	for i, r := range in {
+		users := make([]string, len(r.Users))
+		copy(users, r.Users)
+		out[i] = api.Reaction{Name: r.Name, Count: r.Count, Users: users}
+	}
+	return out
 }
 
 // schedulePaneScrollToBottom retries ScrollToBottom at increasing intervals.
