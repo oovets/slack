@@ -24,7 +24,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/layout"
+	
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/stefan/slack-gui/api"
@@ -225,15 +225,21 @@ func (a *App) Run() {
 	a.statusActionButton.Hide()
 	statusBarInner := container.NewBorder(nil, nil, a.statusLabel, a.statusActionButton, nil)
 	statusBar := container.NewPadded(statusBarInner)
+	// Top bar: team title + Cozy/Compact + theme toggle. The settings
+	// menu remains accessible via the rightmost icon.
 	settingsButton := widget.NewButtonWithIcon("", theme.MenuDropDownIcon(), func() {
 		a.openSettingsMenu()
 	})
 	settingsButton.Importance = widget.LowImportance
 	settingsWrap := container.NewGridWrap(fyne.NewSize(18, 18), settingsButton)
-	topBar := container.NewPadded(container.NewHBox(layout.NewSpacer(), settingsWrap))
-	mainArea := container.NewBorder(nil, statusBar, a.chatListPane, nil, a.paneManager.widget())
+	topBar := container.NewBorder(nil, nil, nil, container.NewPadded(settingsWrap), a.buildTopBar())
+
+	rail := a.buildWorkspaceRail()
+	body := container.NewBorder(nil, statusBar, a.chatListPane, nil, a.paneManager.widget())
+	mainArea := container.NewBorder(nil, nil, rail, nil, body)
 	a.rootContent = container.NewBorder(topBar, nil, nil, nil, mainArea)
 	a.win.SetContent(a.rootContent)
+
 	a.registerShortcuts()
 	a.fyneApp.Lifecycle().SetOnExitedForeground(func() {
 		fyne.Do(func() {
