@@ -128,6 +128,7 @@ type Message struct {
 	Cards         []AttachmentCard
 	InlineImages  []InlineImage
 	MentionedMe   bool
+	MentionedHere bool
 	ReplyCount    int
 	Reactions     []Reaction
 }

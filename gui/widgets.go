@@ -340,6 +340,7 @@ func (e *quickSwitchEntry) TypedShortcut(shortcut fyne.Shortcut) {
 
 // focusEntry is a multi-line Entry that tracks focus state and intercepts
 // Escape (to exit threads / cancel reply) and Ctrl shortcuts.
+// Enter sends (calls OnSubmitted); Shift+Enter inserts a newline.
 type focusEntry struct {
 	widget.Entry
 	onFocused    func()
@@ -347,6 +348,7 @@ type focusEntry struct {
 	onEscape     func()
 	onMentionKey func(*fyne.KeyEvent) bool // intercepts keys while mention popup is open
 	focused      bool
+	shiftDown    bool
 }
 
 func newFocusEntry(onFocused func(), onShortcut func(fyne.Shortcut) bool, onEscape func()) *focusEntry {
@@ -433,6 +435,20 @@ func clearFillRecursive(obj fyne.CanvasObject) {
 	}
 }
 
+func (e *focusEntry) KeyDown(key *fyne.KeyEvent) {
+	if key.Name == desktop.KeyShiftLeft || key.Name == desktop.KeyShiftRight {
+		e.shiftDown = true
+	}
+	e.Entry.KeyDown(key)
+}
+
+func (e *focusEntry) KeyUp(key *fyne.KeyEvent) {
+	if key.Name == desktop.KeyShiftLeft || key.Name == desktop.KeyShiftRight {
+		e.shiftDown = false
+	}
+	e.Entry.KeyUp(key)
+}
+
 func (e *focusEntry) TypedShortcut(shortcut fyne.Shortcut) {
 	if e.onShortcut != nil && e.onShortcut(shortcut) {
 		return
@@ -452,6 +468,22 @@ func (e *focusEntry) TypedKey(key *fyne.KeyEvent) {
 			e.onEscape()
 			return
 		}
+	}
+	// Enter sends the message; Shift+Enter inserts a newline.
+	if key != nil && (key.Name == fyne.KeyReturn || key.Name == fyne.KeyEnter) {
+		if !e.shiftDown {
+			if e.OnSubmitted != nil {
+				e.OnSubmitted(e.Text)
+			}
+			return
+		}
+		// Shift+Enter: insert a newline. The base Entry calls OnSubmitted when
+		// selectKeyDown is true, so nil it out temporarily to get newline behavior.
+		saved := e.OnSubmitted
+		e.OnSubmitted = nil
+		e.Entry.TypedKey(key)
+		e.OnSubmitted = saved
+		return
 	}
 	e.Entry.TypedKey(key)
 }

@@ -185,6 +185,9 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 	if !isFromMe && mentionedMe {
 		bg := canvas.NewRectangle(palette.MentionRowBG)
 		rowCanvas = container.NewMax(bg, rowCanvas)
+	} else if !isFromMe && m.MentionedHere {
+		bg := canvas.NewRectangle(palette.HereMentionBG)
+		rowCanvas = container.NewMax(bg, rowCanvas)
 	}
 	if actionRow != nil {
 		return newMessageActionHover(rowCanvas, actionRow)
@@ -506,6 +509,12 @@ func messageMentionsUser(text, userID string) bool {
 		return false
 	}
 	return strings.Contains(text, "<@"+id+">") || strings.Contains(text, "<@"+id+"|")
+}
+
+func messageMentionsHere(text string) bool {
+	return strings.Contains(text, "<!here>") ||
+		strings.Contains(text, "<!channel>") ||
+		strings.Contains(text, "<!everyone>")
 }
 
 func applyMessageSideIndent(row fyne.CanvasObject) fyne.CanvasObject {

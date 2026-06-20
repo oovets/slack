@@ -26,10 +26,11 @@ type uiPalette struct {
 	ThreadAccent   color.NRGBA
 	ThreadHoverBG  color.NRGBA
 	// Quote / mention highlights
-	QuoteBG      color.NRGBA
-	QuoteBar     color.NRGBA
-	MentionRowBG color.NRGBA
-	MentionAmber color.NRGBA
+	QuoteBG        color.NRGBA
+	QuoteBar       color.NRGBA
+	MentionRowBG   color.NRGBA
+	MentionAmber   color.NRGBA
+	HereMentionBG  color.NRGBA
 
 	// Sidebar (channels/DMs column)
 	SidebarBG      color.NRGBA
@@ -81,10 +82,11 @@ var darkUIColors = uiPalette{
 	ThreadAccent:   color.NRGBA{R: 91, G: 141, B: 255, A: 255},
 	ThreadHoverBG:  color.NRGBA{R: 255, G: 255, B: 255, A: 14},
 
-	QuoteBG:      color.NRGBA{R: 92, G: 99, B: 126, A: 22},
-	QuoteBar:     color.NRGBA{R: 122, G: 162, B: 247, A: 170},
-	MentionRowBG: color.NRGBA{R: 66, G: 53, B: 24, A: 110},
-	MentionAmber: color.NRGBA{R: 242, G: 199, B: 68, A: 255},
+	QuoteBG:       color.NRGBA{R: 92, G: 99, B: 126, A: 22},
+	QuoteBar:      color.NRGBA{R: 122, G: 162, B: 247, A: 170},
+	MentionRowBG:  color.NRGBA{R: 66, G: 53, B: 24, A: 110},
+	MentionAmber:  color.NRGBA{R: 242, G: 199, B: 68, A: 255},
+	HereMentionBG: color.NRGBA{R: 30, G: 80, B: 160, A: 55},
 
 	SidebarBG:      color.NRGBA{R: 15, G: 17, B: 24, A: 255},
 	SidebarHover:   color.NRGBA{R: 255, G: 255, B: 255, A: 12},
@@ -135,10 +137,11 @@ var lightUIColors = uiPalette{
 	ThreadAccent:   color.NRGBA{R: 63, G: 111, B: 214, A: 255},
 	ThreadHoverBG:  color.NRGBA{R: 0, G: 0, B: 0, A: 8},
 
-	QuoteBG:      color.NRGBA{R: 0, G: 0, B: 0, A: 10},
-	QuoteBar:     color.NRGBA{R: 80, G: 130, B: 220, A: 170},
-	MentionRowBG: color.NRGBA{R: 255, G: 220, B: 60, A: 40},
-	MentionAmber: color.NRGBA{R: 150, G: 100, B: 0, A: 255},
+	QuoteBG:       color.NRGBA{R: 0, G: 0, B: 0, A: 10},
+	QuoteBar:      color.NRGBA{R: 80, G: 130, B: 220, A: 170},
+	MentionRowBG:  color.NRGBA{R: 255, G: 220, B: 60, A: 40},
+	MentionAmber:  color.NRGBA{R: 150, G: 100, B: 0, A: 255},
+	HereMentionBG: color.NRGBA{R: 59, G: 130, B: 246, A: 28},
 
 	SidebarBG:      color.NRGBA{R: 0, G: 0, B: 0, A: 0},
 	SidebarHover:   color.NRGBA{R: 0, G: 0, B: 0, A: 8},

@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/oovets/slack/api"
@@ -44,5 +45,26 @@ func main() {
 
 	slackApp := gui.New(client, info, appToken)
 	slackApp.SetInitialOpen(os.Getenv("SLACK_OPEN_CHANNEL_ID"), os.Getenv("SLACK_OPEN_THREAD_TS"))
+
+	if wsNames, cfgPath := workspaceNamesFromConfig(); len(wsNames) > 1 {
+		slackApp.SetWorkspaces(wsNames, cfgPath, func(idx int) {
+			if err := setActiveWorkspace(cfgPath, idx); err != nil {
+				log.Printf("Failed to update active workspace: %v", err)
+				return
+			}
+			exe, err := os.Executable()
+			if err != nil {
+				log.Printf("Failed to resolve executable: %v", err)
+				return
+			}
+			cmd := exec.Command(exe)
+			cmd.Env = os.Environ()
+			if err := cmd.Start(); err != nil {
+				log.Printf("Failed to launch new instance: %v", err)
+				return
+			}
+		})
+	}
+
 	slackApp.Run()
 }

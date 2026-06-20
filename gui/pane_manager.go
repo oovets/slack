@@ -24,6 +24,7 @@ type paneNode struct {
 	pane        *chatPane
 	left, right *paneNode
 	dir         splitDir
+	offset      float64 // 0 means use default 0.5
 }
 
 func (n *paneNode) isLeaf() bool { return n != nil && n.pane != nil }
@@ -44,23 +45,27 @@ func (n *paneNode) buildWidget(showSeparators bool) fyne.CanvasObject {
 	}
 	l := n.left.buildWidget(showSeparators)
 	r := n.right.buildWidget(showSeparators)
+	off := n.offset
+	if off <= 0 || off >= 1 {
+		off = 0.5
+	}
 	if n.dir == splitHorizontal {
 		s := container.NewHSplit(l, r)
-		s.SetOffset(0.5)
+		s.SetOffset(off)
 		if showSeparators {
 			return newSplitWithSeparator(s, splitHorizontal)
 		}
 		return s
 	}
 	s := container.NewVSplit(l, r)
-	s.SetOffset(0.5)
+	s.SetOffset(off)
 	if showSeparators {
 		return newSplitWithSeparator(s, splitVertical)
 	}
 	return s
 }
 
-func (n *paneNode) split(target *chatPane, add *chatPane, dir splitDir) bool {
+func (n *paneNode) split(target *chatPane, add *chatPane, dir splitDir, offset float64) bool {
 	if n.isLeaf() {
 		if n.pane != target {
 			return false
@@ -68,10 +73,11 @@ func (n *paneNode) split(target *chatPane, add *chatPane, dir splitDir) bool {
 		n.left = &paneNode{pane: n.pane}
 		n.right = &paneNode{pane: add}
 		n.dir = dir
+		n.offset = offset
 		n.pane = nil
 		return true
 	}
-	return n.left.split(target, add, dir) || n.right.split(target, add, dir)
+	return n.left.split(target, add, dir, offset) || n.right.split(target, add, dir, offset)
 }
 
 func (n *paneNode) remove(target *chatPane) bool {
@@ -151,10 +157,14 @@ func (pm *paneManager) setFocus(p *chatPane) {
 }
 
 func (pm *paneManager) splitFocused(dir splitDir, newPane *chatPane) {
+	pm.splitFocusedAt(dir, newPane, 0)
+}
+
+func (pm *paneManager) splitFocusedAt(dir splitDir, newPane *chatPane, offset float64) {
 	if pm.focused == nil || len(pm.allPanes()) >= pm.maxPanes || newPane == nil {
 		return
 	}
-	pm.root.split(pm.focused, newPane, dir)
+	pm.root.split(pm.focused, newPane, dir, offset)
 	pm.setFocus(newPane)
 	pm.syncInputVisibility(true)
 	pm.rebuild()
@@ -303,6 +313,7 @@ type paneStateNode struct {
 	ChannelID string         `json:"channelID,omitempty"`
 	ThreadTS  string         `json:"threadTS,omitempty"`
 	Dir       string         `json:"dir,omitempty"`
+	Offset    float64        `json:"offset,omitempty"`
 	Left      *paneStateNode `json:"left,omitempty"`
 	Right     *paneStateNode `json:"right,omitempty"`
 }
@@ -389,7 +400,7 @@ func (pm *paneManager) restoreNode(n *paneStateNode, idMap map[int]*chatPane) (*
 	if strings.ToLower(n.Dir) == "vertical" {
 		dir = splitVertical
 	}
-	return &paneNode{left: left, right: right, dir: dir}, nil
+	return &paneNode{left: left, right: right, dir: dir, offset: n.Offset}, nil
 }
 
 func serializePaneNode(n *paneNode) *paneStateNode {
@@ -408,9 +419,10 @@ func serializePaneNode(n *paneNode) *paneStateNode {
 		dir = "vertical"
 	}
 	return &paneStateNode{
-		Dir:   dir,
-		Left:  serializePaneNode(n.left),
-		Right: serializePaneNode(n.right),
+		Dir:    dir,
+		Offset: n.offset,
+		Left:   serializePaneNode(n.left),
+		Right:  serializePaneNode(n.right),
 	}
 }
 

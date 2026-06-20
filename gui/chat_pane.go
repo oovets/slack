@@ -40,6 +40,7 @@ type chatPane struct {
 	threadTS    string
 	replyTarget *api.Message
 
+	formatBar   fyne.CanvasObject
 	inputBg     *canvas.Rectangle
 	inputBorder *canvas.Rectangle
 	threadBg    *canvas.Rectangle
@@ -134,8 +135,8 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 		p.input,
 	)
 	entryRow := container.NewStack(p.inputBg, p.inputBorder, inner)
-	formatBar := newFormatBar(p.input)
-	composer := container.NewVBox(formatBar, entryRow)
+	p.formatBar = newFormatBar(p.input)
+	composer := container.NewVBox(p.formatBar, entryRow)
 	p.inputCard = container.NewVBox(p.inputTopGap, p.threadHolder, p.replyHolder, container.NewPadded(composer))
 
 	// Channel header bar (name + topic) painted at top.
@@ -380,4 +381,18 @@ func (p *chatPane) handleMentionKey(key *fyne.KeyEvent) bool {
 		return true
 	}
 	return false
+}
+
+func (p *chatPane) setFormatBarVisible(show bool) {
+	if p.formatBar == nil {
+		return
+	}
+	if show {
+		p.formatBar.Show()
+	} else {
+		p.formatBar.Hide()
+	}
+	if p.inputCard != nil {
+		p.inputCard.Refresh()
+	}
 }

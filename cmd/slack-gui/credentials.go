@@ -83,6 +83,56 @@ func candidateSlackConfigPaths() []string {
 	return out
 }
 
+// workspaceNamesFromConfig reads workspace names from the first readable config
+// file and returns them along with the config path. Returns empty if no config
+// file is found or it contains fewer than two workspaces.
+func workspaceNamesFromConfig() (names []string, configPath string) {
+	for _, p := range candidateSlackConfigPaths() {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var cfg slackConfigFile
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			continue
+		}
+		if len(cfg.Workspaces) < 2 {
+			return nil, ""
+		}
+		out := make([]string, len(cfg.Workspaces))
+		for i, ws := range cfg.Workspaces {
+			name := strings.TrimSpace(ws.Name)
+			if name == "" {
+				name = "Workspace " + fmt.Sprintf("%d", i+1)
+			}
+			out[i] = name
+		}
+		return out, p
+	}
+	return nil, ""
+}
+
+// setActiveWorkspace writes an updated active_workspace index to the config file.
+func setActiveWorkspace(path string, idx int) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var cfg slackConfigFile
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return err
+	}
+	if idx < 0 || idx >= len(cfg.Workspaces) {
+		return fmt.Errorf("workspace index %d out of range", idx)
+	}
+	cfg.ActiveWorkspace = idx
+	out, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, out, 0600)
+}
+
 func credentialsFromSlackConfig(path string) (string, string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

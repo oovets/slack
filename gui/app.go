@@ -59,6 +59,7 @@ const (
 	prefPaneLayoutState = "ui.pane_layout_state"
 	prefPaneSeparators  = "ui.pane_separators"
 	prefFavorites       = "ui.favorites"
+	prefShowFormatBar   = "ui.show_format_bar"
 )
 
 // Section keys for the sidebar channel list.
@@ -142,6 +143,11 @@ type App struct {
 	showChatList             bool
 	showTimestamps           bool
 	showImagePreviews        bool
+	showFormatBar            bool
+
+	workspaceNames      []string
+	workspaceConfigPath string
+	workspaceSwitchFn   func(int)
 
 	paneManager *paneManager
 
@@ -200,6 +206,7 @@ func New(c *api.Client, info *api.AuthInfo, appToken string) *App {
 		channelByID:        map[string]api.Channel{},
 		favorites:          map[string]bool{},
 		showChatList:       true,
+		showFormatBar:      true,
 		showPaneSeparators: true,
 		windowWidth:        896,
 		windowHeight:       820,
@@ -211,6 +218,16 @@ func New(c *api.Client, info *api.AuthInfo, appToken string) *App {
 func (a *App) SetInitialOpen(channelID, threadTS string) {
 	a.initialChannelID = strings.TrimSpace(channelID)
 	a.initialThreadTS = strings.TrimSpace(threadTS)
+}
+
+// SetWorkspaces provides the list of available workspace names, the path to
+// the config file, and a callback invoked when the user picks a new workspace.
+// The callback should update the config file and relaunch the process; the App
+// will call Quit() after invoking it.
+func (a *App) SetWorkspaces(names []string, configPath string, switchFn func(int)) {
+	a.workspaceNames = names
+	a.workspaceConfigPath = configPath
+	a.workspaceSwitchFn = switchFn
 }
 
 func (a *App) Run() {
@@ -238,6 +255,7 @@ func (a *App) Run() {
 				a.handleInputShortcut,
 			)
 			a.initPaneMention(p)
+			p.setFormatBarVisible(a.showFormatBar)
 			return p
 		},
 	)
@@ -612,27 +630,53 @@ func sidebarHSpacer(width float32) fyne.CanvasObject {
 
 func (a *App) loadInitialData() error {
 	a.setStatus("Loading channels...")
-	emojiNotice := ""
-	if dir, err := a.client.UserDirectory(); err != nil {
-		log.Printf("[SLACK-GUI] users directory failed: %v", err)
-	} else {
-		a.buildUserDirectory(dir)
+
+	// Run all three independent startup API calls in parallel.
+	type userDirResult struct {
+		dir []api.UserInfo
+		err error
 	}
-	if emojiMap, err := a.client.EmojiList(); err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "missing_scope") {
+	type emojiResult struct {
+		m   map[string]string
+		err error
+	}
+	type channelsResult struct {
+		channels []api.Channel
+		err      error
+	}
+	udCh := make(chan userDirResult, 1)
+	emCh := make(chan emojiResult, 1)
+	chCh := make(chan channelsResult, 1)
+	go func() { dir, err := a.client.UserDirectory(); udCh <- userDirResult{dir, err} }()
+	go func() { m, err := a.client.EmojiList(); emCh <- emojiResult{m, err} }()
+	go func() { ch, err := a.client.ListChannels(200); chCh <- channelsResult{ch, err} }()
+
+	udRes := <-udCh
+	if udRes.err != nil {
+		log.Printf("[SLACK-GUI] users directory failed: %v", udRes.err)
+	} else {
+		a.buildUserDirectory(udRes.dir)
+	}
+
+	emRes := <-emCh
+	emojiNotice := ""
+	if emRes.err != nil {
+		if strings.Contains(strings.ToLower(emRes.err.Error()), "missing_scope") {
 			log.Printf("[SLACK-GUI] emoji.list unavailable: missing scope. Add emoji:read in Slack app OAuth & Permissions and reinstall app.")
 			emojiNotice = "emoji.list saknas (emoji:read)"
 		} else {
-			log.Printf("[SLACK-GUI] emoji.list failed: %v", err)
+			log.Printf("[SLACK-GUI] emoji.list failed: %v", emRes.err)
 			emojiNotice = "emoji.list fel"
 		}
 	} else {
-		setWorkspaceEmojiMap(emojiMap)
+		setWorkspaceEmojiMap(emRes.m)
 	}
-	channels, err := a.client.ListChannels(200)
-	if err != nil {
-		return err
+
+	chRes := <-chCh
+	if chRes.err != nil {
+		return chRes.err
 	}
+	channels := chRes.channels
 	sort.Slice(channels, func(i, j int) bool {
 		return strings.ToLower(channels[i].Name) < strings.ToLower(channels[j].Name)
 	})
@@ -642,6 +686,7 @@ func (a *App) loadInitialData() error {
 		a.channelByID[ch.ID] = ch
 	}
 	a.refreshChannelDisplayNames()
+	a.resolveGroupNamesInBackground()
 	// refreshRecentThreads makes up to 24 ChannelHistory API calls. Run it in
 	// the background so startup is not blocked. The sidebar shows immediately
 	// without threads; a second rebuildFilteredChannels follows on completion.
@@ -706,9 +751,10 @@ func (a *App) refreshChannelDisplayNames() {
 				ch.DisplayName = n
 			}
 		case ch.IsMPIM:
-			participants := a.resolveGroupParticipantNames(ch.ID)
-			if len(participants) > 0 {
-				ch.DisplayName = strings.Join(participants, ", ")
+			// Only use cached names here; uncached groups are resolved asynchronously
+			// by resolveGroupNamesInBackground to avoid blocking startup.
+			if cached := strings.TrimSpace(a.groupNameCache[ch.ID]); cached != "" {
+				ch.DisplayName = cached
 			}
 		default:
 			ch.DisplayName = ch.Name
@@ -718,6 +764,71 @@ func (a *App) refreshChannelDisplayNames() {
 	for _, ch := range a.channels {
 		a.channelByID[ch.ID] = ch
 	}
+}
+
+// resolveGroupNamesInBackground fetches member lists for all MPIM group DMs
+// that are not yet in the cache. All fetches run in parallel; when all are
+// done, display names and the sidebar are refreshed once on the main goroutine.
+func (a *App) resolveGroupNamesInBackground() {
+	type result struct {
+		id    string
+		names string
+	}
+
+	var pending []string
+	for _, ch := range a.channels {
+		if ch.IsMPIM && strings.TrimSpace(a.groupNameCache[ch.ID]) == "" {
+			pending = append(pending, ch.ID)
+		}
+	}
+	if len(pending) == 0 {
+		return
+	}
+
+	selfID := strings.TrimSpace(a.info.UserID)
+	userSnap := a.snapshotUsers()
+	results := make(chan result, len(pending))
+
+	for _, cid := range pending {
+		cid := cid
+		go func() {
+			memberIDs, err := a.client.ConversationMembers(cid)
+			if err != nil {
+				results <- result{id: cid}
+				return
+			}
+			out := make([]string, 0, len(memberIDs))
+			for _, id := range memberIDs {
+				id = strings.TrimSpace(id)
+				if id == "" || id == selfID {
+					continue
+				}
+				name := strings.TrimSpace(userSnap[id])
+				if name == "" {
+					name = id
+				}
+				out = append(out, name)
+			}
+			sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i]) < strings.ToLower(out[j]) })
+			results <- result{id: cid, names: strings.Join(out, ", ")}
+		}()
+	}
+
+	go func() {
+		for range pending {
+			r := <-results
+			if r.names == "" {
+				continue
+			}
+			fyne.Do(func() {
+				a.groupNameCache[r.id] = r.names
+			})
+		}
+		fyne.Do(func() {
+			a.refreshChannelDisplayNames()
+			a.rebuildFilteredChannels()
+		})
+	}()
 }
 
 func (a *App) resolveGroupParticipantNames(channelID string) []string {
@@ -1269,6 +1380,7 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 		}
 		for i := range msgs {
 			msgs[i].MentionedMe = messageMentionsUser(msgs[i].Text, a.info.UserID) || messageMentionsUser(msgs[i].ForwardedText, a.info.UserID)
+			msgs[i].MentionedHere = messageMentionsHere(msgs[i].Text) || messageMentionsHere(msgs[i].ForwardedText)
 			msgs[i].Text = a.formatMentionsForDisplay(msgs[i].Text)
 			msgs[i].ForwardedText = a.formatMentionsForDisplay(msgs[i].ForwardedText)
 			if msgs[i].AvatarURL == "" && msgs[i].UserID != "" {
@@ -1991,14 +2103,27 @@ func (a *App) openThreadFromList(t threadListEntry) {
 	if strings.TrimSpace(t.ChannelID) == "" || strings.TrimSpace(t.ThreadTS) == "" {
 		return
 	}
-	p := a.paneManager.focusedPane()
-	if p == nil {
-		return
-	}
 	ch, ok := a.channelByID[t.ChannelID]
 	if !ok {
 		return
 	}
+
+	// Reuse an existing thread pane if one is open, otherwise create a new
+	// horizontal split with the thread on the right at 30% width.
+	var p *chatPane
+	for _, pane := range a.paneManager.allPanes() {
+		if strings.TrimSpace(pane.threadTS) != "" {
+			p = pane
+			break
+		}
+	}
+	if p == nil {
+		p = a.newPane()
+		a.paneManager.splitFocusedAt(splitHorizontal, p, 0.7)
+	} else {
+		a.paneManager.setFocus(p)
+	}
+
 	p.channelID = t.ChannelID
 	p.channelName = a.chatBaseName(ch)
 	p.threadTS = strings.TrimSpace(t.ThreadTS)
@@ -2007,6 +2132,7 @@ func (a *App) openThreadFromList(t threadListEntry) {
 	p.input.SetPlaceHolder(a.chatInputPlaceholder(ch))
 	p.setTitle(fmt.Sprintf("%s%s — thread", a.chatPrefix(ch), p.channelName))
 	p.setLoadingMessages()
+	a.setSelectedSidebarThread(t.ChannelID, t.ThreadTS)
 	a.schedulePaneScrollToBottom(p)
 	a.savePaneLayoutState()
 	go a.loadMessagesForPane(p)
@@ -2522,6 +2648,30 @@ func (a *App) buildSettingsMenu() *fyne.Menu {
 	fontItem := fyne.NewMenuItem("Font", nil)
 	fontItem.ChildMenu = fyne.NewMenu("", fontItems...)
 
+	formatBarLabel := "Hide Formatting Toolbar"
+	if !a.showFormatBar {
+		formatBarLabel = "Show Formatting Toolbar"
+	}
+
+	var workspaceItem *fyne.MenuItem
+	if len(a.workspaceNames) > 1 {
+		wsItems := make([]*fyne.MenuItem, len(a.workspaceNames))
+		for i, name := range a.workspaceNames {
+			idx := i
+			n := name
+			wsItems[i] = fyne.NewMenuItem(n, func() {
+				if a.workspaceSwitchFn != nil {
+					a.workspaceSwitchFn(idx)
+				}
+				if a.fyneApp != nil {
+					a.fyneApp.Quit()
+				}
+			})
+		}
+		workspaceItem = fyne.NewMenuItem("Switch Workspace", nil)
+		workspaceItem.ChildMenu = fyne.NewMenu("", wsItems...)
+	}
+
 	windowMenu := fyne.NewMenu("Window",
 		fyne.NewMenuItem("Quick Switcher  ⌃K", func() { a.openQuickSwitcher() }),
 		fyne.NewMenuItemSeparator(),
@@ -2570,12 +2720,16 @@ func (a *App) buildSettingsMenu() *fyne.Menu {
 		fontItem,
 		fyne.NewMenuItem(timestampsLabel, func() { a.setShowTimestamps(!a.showTimestamps) }),
 		fyne.NewMenuItem(imagePreviewsLabel, func() { a.setShowImagePreviews(!a.showImagePreviews) }),
+		fyne.NewMenuItem(formatBarLabel, func() { a.setShowFormatBar(!a.showFormatBar) }),
 		fyne.NewMenuItem(separatorLabel, func() { a.togglePaneSeparators() }),
 		fyne.NewMenuItem("Toggle Channel List", func() { a.toggleChatList() }),
 		fyne.NewMenuItem(compactLabel, func() { a.setCompactMode(!a.appTheme.compactMode) }),
 		fyne.NewMenuItem(colorModeLabel, func() { a.setDarkMode(!a.appTheme.dark) }),
 	)
-	items := make([]*fyne.MenuItem, 0, len(windowMenu.Items)+len(viewMenu.Items)+3)
+	items := make([]*fyne.MenuItem, 0, len(windowMenu.Items)+len(viewMenu.Items)+5)
+	if workspaceItem != nil {
+		items = append(items, workspaceItem, fyne.NewMenuItemSeparator())
+	}
 	items = append(items, windowMenu.Items...)
 	items = append(items, fyne.NewMenuItemSeparator())
 	items = append(items, viewMenu.Items...)
@@ -2674,6 +2828,16 @@ func (a *App) setShowImagePreviews(enabled bool) {
 		a.fyneApp.Preferences().SetBool(prefImagePreviews, enabled)
 	}
 	a.refreshPanesForTheme()
+}
+
+func (a *App) setShowFormatBar(enabled bool) {
+	a.showFormatBar = enabled
+	if a.fyneApp != nil {
+		a.fyneApp.Preferences().SetBool(prefShowFormatBar, enabled)
+	}
+	for _, p := range a.paneManager.allPanes() {
+		p.setFormatBarVisible(enabled)
+	}
 }
 
 func (a *App) setFontSize(size int) {
@@ -2790,6 +2954,7 @@ func (a *App) newPane() *chatPane {
 		a.handleInputShortcut,
 	)
 	a.initPaneMention(p)
+	p.setFormatBarVisible(a.showFormatBar)
 	return p
 }
 
@@ -2801,6 +2966,7 @@ func (a *App) loadUIState() {
 	a.showChatList = prefs.BoolWithFallback(prefShowChatList, true)
 	a.showTimestamps = prefs.BoolWithFallback(prefShowTimestamps, false)
 	a.showImagePreviews = prefs.BoolWithFallback(prefImagePreviews, true)
+	a.showFormatBar = prefs.BoolWithFallback(prefShowFormatBar, true)
 	a.appTheme.dark = prefs.BoolWithFallback(prefDarkMode, a.appTheme.dark)
 	a.appTheme.compactMode = prefs.BoolWithFallback(prefCompactMode, true)
 	fontSize := prefs.IntWithFallback(prefFontSize, int(a.appTheme.fontSize))
@@ -2841,6 +3007,15 @@ func (a *App) saveWindowSizePreference() {
 	prefs.SetFloat(prefWindowHeight, float64(size.Height))
 }
 
+// paneLayoutPrefKey returns a workspace-specific preference key so each Slack
+// workspace gets its own saved pane layout. UserID is unique per workspace.
+func (a *App) paneLayoutPrefKey() string {
+	if a.info != nil && strings.TrimSpace(a.info.UserID) != "" {
+		return prefPaneLayoutState + "." + strings.TrimSpace(a.info.UserID)
+	}
+	return prefPaneLayoutState
+}
+
 func (a *App) savePaneLayoutState() {
 	if a.fyneApp == nil || a.paneManager == nil {
 		return
@@ -2850,14 +3025,14 @@ func (a *App) savePaneLayoutState() {
 		log.Printf("[SLACK-GUI] serialize layout failed: %v", err)
 		return
 	}
-	a.fyneApp.Preferences().SetString(prefPaneLayoutState, raw)
+	a.fyneApp.Preferences().SetString(a.paneLayoutPrefKey(), raw)
 }
 
 func (a *App) restorePaneLayoutState() {
 	if a.fyneApp == nil || a.paneManager == nil {
 		return
 	}
-	raw := a.fyneApp.Preferences().StringWithFallback(prefPaneLayoutState, "")
+	raw := a.fyneApp.Preferences().StringWithFallback(a.paneLayoutPrefKey(), "")
 	if strings.TrimSpace(raw) == "" {
 		return
 	}
