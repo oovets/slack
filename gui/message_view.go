@@ -174,10 +174,7 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 	}
 	if !isFromMe && mentionedMe {
 		bg := canvas.NewRectangle(palette.MentionRowBG)
-		bar := canvas.NewRectangle(palette.MentionAmber)
-		bar.SetMinSize(fyne.NewSize(3, 1))
-		barWrap := container.NewBorder(nil, nil, bar, nil, rowCanvas)
-		rowCanvas = container.NewMax(bg, barWrap)
+		rowCanvas = container.NewMax(bg, rowCanvas)
 	}
 	if actionRow != nil {
 		return newMessageActionHover(rowCanvas, actionRow)

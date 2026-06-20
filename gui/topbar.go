@@ -57,7 +57,7 @@ func (a *App) buildWorkspaceRail() fyne.CanvasObject {
 	stacked := container.NewBorder(col, bottom, nil, nil, canvas.NewRectangle(color.Transparent))
 
 	wrap := container.NewStack(bg, stacked)
-	return &fixedWidthBox{CanvasObject: wrap, w: 52}
+	return &fixedWidthBox{CanvasObject: wrap, w: 44}
 }
 
 func userInitialsFrom(name string) string {
@@ -69,7 +69,7 @@ func userInitialsFrom(name string) string {
 }
 
 // fixedWidthBox wraps any object and reports a fixed-width MinSize so the
-// workspace rail keeps its 52px column regardless of content.
+// workspace rail keeps its fixed column regardless of content.
 type fixedWidthBox struct {
 	fyne.CanvasObject
 	w float32

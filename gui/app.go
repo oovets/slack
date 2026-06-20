@@ -304,7 +304,7 @@ func (a *App) buildSidebar() {
 			bg.CornerRadius = 6
 			icon := canvas.NewImageFromResource(sidebarIconChannel)
 			icon.FillMode = canvas.ImageFillContain
-			iconWrap := container.NewGridWrap(fyne.NewSize(12, 12), icon)
+			iconWrap := container.NewGridWrap(fyne.NewSize(10, 12), icon)
 			dot := canvas.NewText("", palette.ThreadAccent)
 			dot.TextSize = 7
 			dotWrap := container.NewGridWrap(fyne.NewSize(8, 14), container.NewCenter(dot))
@@ -313,7 +313,7 @@ func (a *App) buildSidebar() {
 			fav := newGlyph("☆", nil)
 			fav.Hide()
 			favWrap := container.NewGridWrap(fyne.NewSize(14, 14), fav)
-			left := container.NewHBox(fixedWidthSpacer(2), iconWrap, fixedWidthSpacer(4))
+			left := container.NewHBox(iconWrap, fixedWidthSpacer(2))
 			right := container.NewHBox(dotWrap, favWrap, fixedWidthSpacer(4))
 			content := container.NewBorder(nil, nil, left, right, lbl)
 			return newSidebarHoverRow(container.NewMax(bg, content), nil)
