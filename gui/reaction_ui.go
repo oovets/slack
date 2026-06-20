@@ -105,11 +105,12 @@ func (c *reactionChip) applyHoverTint() {
 type reactionChipRenderer struct{ chip *reactionChip }
 
 const (
-	chipPadX   = float32(6)
-	chipPadY   = float32(1)
+	chipPadX   = float32(5)
+	chipPadY   = float32(0)
 	chipInnerG = float32(3)
-	chipMinH   = float32(20)
+	chipMinH   = float32(18)
 )
+
 
 
 func (r *reactionChipRenderer) MinSize() fyne.Size {
