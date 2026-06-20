@@ -219,12 +219,13 @@ func (p *chatPane) scrollToBottomSoon() {
 	}()
 }
 
-func (p *chatPane) setMessages(msgs []api.Message, currentUserID, selfUserID string, showTimestamps bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error)) {
+func (p *chatPane) setMessages(msgs []api.Message, currentUserID, selfUserID string, win fyne.Window, showTimestamps bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error)) {
 	p.msgList.setMessages(msgs, messageRenderCtx{
 		currentUserID:  currentUserID,
 		selfUserID:     selfUserID,
 		showTimestamps: showTimestamps,
 		inThreadView:   strings.TrimSpace(p.threadTS) != "",
+		win:            win,
 		onThread:       onThread,
 		onReply:        onReply,
 		onMedia:        onMedia,

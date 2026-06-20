@@ -31,17 +31,12 @@ var (
 	workspaceEmojiAliasByKey = map[string]string{}
 )
 
-func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, showTimestamps bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error), showHeader bool, inThreadView bool) fyne.CanvasObject {
+func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID string, win fyne.Window, showTimestamps bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error), showHeader bool, inThreadView bool) fyne.CanvasObject {
 	name := senderName(m)
 	ts := canvas.NewText(formatHoverTimestamp(m.Time), color.NRGBA{R: 100, G: 106, B: 130, A: 190})
 	ts.TextSize = hoverTimestampTextSize()
 
-	body := widget.NewLabel(renderSlackText(m.Text))
-	body.Wrapping = fyne.TextWrapWord
-	if isFromMe {
-		body.Alignment = fyne.TextAlignTrailing
-		body.Importance = widget.LowImportance
-	}
+	body := newMessageBody(m.Text, isFromMe)
 	row := container.NewVBox(alignOutgoingRow(body, isFromMe))
 	rowWithMeta := container.NewVBox()
 	if quoted := strings.TrimSpace(renderSlackText(m.ForwardedText)); quoted != "" {
@@ -78,25 +73,29 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, showTimest
 			onReply(m)
 		}), isFromMe))
 	}
-	if len(m.Reactions) > 0 {
+	// Reactions row: always show the "+" add button so users can react to
+	// any message, even ones that haven't received reactions yet.
+	if onReaction != nil || len(m.Reactions) > 0 {
 		reactionRow := container.NewHBox()
 		for _, reaction := range m.Reactions {
-			emojiObj := newReactionEmojiView(reaction.Name)
-			count := canvas.NewText(fmt.Sprintf("%d", reaction.Count), color.NRGBA{R: 120, G: 126, B: 146, A: 210})
-			count.TextSize = reactionCountTextSize()
-			count.TextStyle = fyne.TextStyle{}
-			content := container.NewHBox(emojiObj, count)
-			chipBg := canvas.NewRectangle(color.NRGBA{R: 120, G: 126, B: 146, A: 28})
-			chip := container.NewMax(chipBg, container.NewBorder(nil, nil, fixedWidthSpacer(2), fixedWidthSpacer(2), content))
+			r := reaction
+			var tap func()
 			if onReaction != nil {
-				reactionName := reaction.Name
-				chip = container.NewMax(newTapWrap(chip, func() {
-					onReaction(m, reactionName)
-				}))
+				tap = func() { onReaction(m, r.Name) }
 			}
-			reactionRow.Add(chip)
+			reactionRow.Add(newReactionChip(r, selfUserID, tap))
 		}
-		rowWithMeta.Add(alignOutgoingRow(reactionRow, isFromMe))
+		if onReaction != nil {
+			addBtn := newAddReactionButton(win, func(name string) {
+				onReaction(m, name)
+			})
+			if addBtn != nil {
+				reactionRow.Add(addBtn)
+			}
+		}
+		if len(reactionRow.Objects) > 0 {
+			rowWithMeta.Add(alignOutgoingRow(reactionRow, isFromMe))
+		}
 	}
 
 	var content *fyne.Container
