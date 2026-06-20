@@ -39,6 +39,7 @@ Recommended Slack scopes:
 - `users:read`
 - `users:read.email` (optional)
 - `emoji:read` (optional, enables workspace emoji/reaction mapping)
+- `team:read` (optional, enables the workspace icon in the chat list)
 
 ## Quick Start
 

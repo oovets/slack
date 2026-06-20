@@ -75,18 +75,21 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 	if !inThreadView && m.ReplyCount > 0 {
 		rowWithMeta.Add(alignOutgoingRow(newThreadReplyBar(m.ReplyCount, openThread), isFromMe))
 	}
-	// Unified actions row: existing reactions + "+" add + reply icon, all
-	// on the same line. Keeps the message vertically tight.
-	if onReaction != nil || onReply != nil || len(m.Reactions) > 0 {
-		actionsRow := container.NewHBox()
+	if len(m.Reactions) > 0 {
+		reactionsRow := container.NewHBox()
 		for _, reaction := range m.Reactions {
 			r := reaction
 			var tap func()
 			if onReaction != nil {
 				tap = func() { onReaction(m, r.Name) }
 			}
-			actionsRow.Add(newReactionChip(r, selfUserID, tap))
+			reactionsRow.Add(newReactionChip(r, selfUserID, tap))
 		}
+		rowWithMeta.Add(alignOutgoingRow(reactionsRow, isFromMe))
+	}
+	// Hover-only actions: keep add/reply available without reserving a row.
+	if onReaction != nil || onReply != nil {
+		actionsRow := container.NewHBox()
 		if onReaction != nil {
 			if addBtn := newAddReactionButton(win, func(name string) { onReaction(m, name) }); addBtn != nil {
 				actionsRow.Add(addBtn)

@@ -132,14 +132,16 @@ type App struct {
 	statusActionButton *widget.Button
 
 	// Chrome canvas refs updated on light/dark switch.
-	sidebarBg         *canvas.Rectangle
-	sidebarTitle      *canvas.Text
-	settingsIcon      fyne.CanvasObject
-	statusActionLabel string
-	statusActionFn    func()
-	showChatList      bool
-	showTimestamps    bool
-	showImagePreviews bool
+	sidebarBg                *canvas.Rectangle
+	sidebarTitle             *canvas.Text
+	sidebarWorkspaceIcon     *canvas.Image
+	sidebarWorkspaceIconWrap *fyne.Container
+	settingsIcon             fyne.CanvasObject
+	statusActionLabel        string
+	statusActionFn           func()
+	showChatList             bool
+	showTimestamps           bool
+	showImagePreviews        bool
 
 	paneManager *paneManager
 
@@ -254,6 +256,7 @@ func (a *App) Run() {
 	body := container.NewBorder(nil, statusBar, a.chatListPane, nil, a.paneManager.widget())
 	a.rootContent = container.NewStack(body)
 	a.win.SetContent(a.rootContent)
+	a.loadWorkspaceIconAsync()
 
 	a.registerShortcuts()
 	a.fyneApp.Lifecycle().SetOnExitedForeground(func() {
@@ -483,10 +486,19 @@ func (a *App) buildSidebar() {
 	titleGlyph.text.TextStyle = fyne.TextStyle{Bold: true}
 	titleGlyph.text.Color = palette.MetaTextStrong
 	a.sidebarTitle = titleGlyph.text
+	workspaceIcon := canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 1, 1)))
+	workspaceIcon.FillMode = canvas.ImageFillContain
+	workspaceIcon.SetMinSize(fyne.NewSize(22, 22))
+	a.sidebarWorkspaceIcon = workspaceIcon
+	iconWrap := container.NewGridWrap(fyne.NewSize(22, 22), workspaceIcon)
+	iconSlot := container.NewHBox(iconWrap, fixedWidthSpacer(6))
+	iconSlot.Hide()
+	a.sidebarWorkspaceIconWrap = iconSlot
+	titleArea := container.NewHBox(iconSlot, titleGlyph)
 	settingsBtn := newGhostIcon(sidebarIconSettings, func() { a.openSettingsMenu() })
 	a.settingsIcon = settingsBtn
 	settingsWrap := container.NewGridWrap(fyne.NewSize(18, 18), settingsBtn)
-	header := container.NewBorder(nil, nil, titleGlyph, settingsWrap, nil)
+	header := container.NewBorder(nil, nil, titleArea, settingsWrap, nil)
 
 	left := container.NewBorder(
 		container.NewVBox(header, fixedHeightSpacer(6), a.channelSearch),
@@ -502,6 +514,52 @@ func (a *App) buildSidebar() {
 	if !a.showChatList {
 		a.chatListPane.setShown(false)
 	}
+}
+
+func (a *App) loadWorkspaceIconAsync() {
+	if a.client == nil {
+		return
+	}
+	go func() {
+		team, err := a.client.TeamInfo()
+		if err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "missing_scope") {
+				log.Printf("[SLACK-GUI] team.info unavailable: missing scope. Add team:read in Slack app OAuth & Permissions and reinstall app.")
+			} else {
+				log.Printf("[SLACK-GUI] team.info failed: %v", err)
+			}
+			return
+		}
+		name := strings.TrimSpace(team.Name)
+		iconURL := strings.TrimSpace(team.IconURL)
+		var iconRes fyne.Resource
+		if iconURL != "" {
+			data, err := fetchPreviewImage(iconURL, a.client.FetchPrivateURL)
+			if err != nil {
+				log.Printf("[SLACK-GUI] workspace icon fetch failed: %v", err)
+			} else if _, _, err := image.Decode(bytes.NewReader(data)); err != nil {
+				log.Printf("[SLACK-GUI] workspace icon decode failed: %v", err)
+			} else {
+				iconRes = fyne.NewStaticResource("workspace-icon", data)
+			}
+		}
+		fyne.Do(func() {
+			if name != "" && a.sidebarTitle != nil {
+				a.sidebarTitle.Text = name
+				a.sidebarTitle.Refresh()
+			}
+			if iconRes != nil && a.sidebarWorkspaceIcon != nil && a.sidebarWorkspaceIconWrap != nil {
+				a.sidebarWorkspaceIcon.Resource = iconRes
+				a.sidebarWorkspaceIcon.Show()
+				a.sidebarWorkspaceIconWrap.Show()
+				a.sidebarWorkspaceIcon.Refresh()
+				a.sidebarWorkspaceIconWrap.Refresh()
+				if a.chatListPane != nil {
+					a.chatListPane.Refresh()
+				}
+			}
+		})
+	}()
 }
 
 func sidebarRowParts(obj fyne.CanvasObject) (bg *canvas.Rectangle, icon *canvas.Image, lbl *widget.Label, dot *canvas.Text, fav *glyph, hover *sidebarHoverRow) {

@@ -25,6 +25,11 @@ type AuthInfo struct {
 	TeamName string
 }
 
+type TeamInfo struct {
+	Name    string
+	IconURL string
+}
+
 type UserInfo struct {
 	ID          string
 	Username    string
@@ -161,6 +166,46 @@ func (c *Client) AuthTest() (*AuthInfo, error) {
 		return nil, err
 	}
 	return &AuthInfo{UserID: out.UserID, UserName: out.User, TeamName: out.Team}, nil
+}
+
+func (c *Client) TeamInfo() (*TeamInfo, error) {
+	var out struct {
+		slackEnvelope
+		Team struct {
+			Name string `json:"name"`
+			Icon struct {
+				Image34      string `json:"image_34"`
+				Image44      string `json:"image_44"`
+				Image68      string `json:"image_68"`
+				Image88      string `json:"image_88"`
+				Image102     string `json:"image_102"`
+				Image132     string `json:"image_132"`
+				Image230     string `json:"image_230"`
+				ImageDefault bool   `json:"image_default"`
+			} `json:"icon"`
+		} `json:"team"`
+	}
+	if err := c.postForm("team.info", nil, &out); err != nil {
+		return nil, err
+	}
+	iconURL := ""
+	if !out.Team.Icon.ImageDefault {
+		for _, u := range []string{
+			out.Team.Icon.Image132,
+			out.Team.Icon.Image102,
+			out.Team.Icon.Image88,
+			out.Team.Icon.Image68,
+			out.Team.Icon.Image44,
+			out.Team.Icon.Image34,
+			out.Team.Icon.Image230,
+		} {
+			if strings.TrimSpace(u) != "" {
+				iconURL = strings.TrimSpace(u)
+				break
+			}
+		}
+	}
+	return &TeamInfo{Name: strings.TrimSpace(out.Team.Name), IconURL: iconURL}, nil
 }
 
 func (c *Client) ListChannels(limit int) ([]Channel, error) {
