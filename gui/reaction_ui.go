@@ -523,7 +523,7 @@ func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 	rebuild(current)
 
 	scrollGrid := container.NewVScroll(grid)
-	scrollGrid.SetMinSize(fyne.NewSize(420, 300))
+	scrollGrid.SetMinSize(fyne.NewSize(280, 220))
 
 	footer := container.NewBorder(nil, nil, hoverLabel, status, nil)
 
