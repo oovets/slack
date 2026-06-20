@@ -160,8 +160,8 @@ func (mc *mentionCompleter) confirm() {
 	}
 }
 
-func selBGColor() color.Color    { return palette.SidebarSelBG }
-func popupBGColor() color.Color  { return palette.ComposerBG }
+func selBGColor() color.Color       { return palette.SidebarSelBG }
+func popupBGColor() color.Color     { return palette.ComposerBG }
 func popupBorderColor() color.Color { return color.Color(palette.ComposerBorder) }
 
 // mentionPrefixAt returns the word after the last @ before the cursor (row, col),
