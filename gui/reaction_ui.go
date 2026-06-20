@@ -10,114 +10,259 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 	"github.com/stefan/slack-gui/api"
 )
 
-// reactionChipColors picks the chip background + count colors based on
-// whether the current user has already reacted with this emoji.
-type reactionChipColors struct {
-	bg     color.NRGBA
-	stroke color.NRGBA
-	text   color.NRGBA
-}
+// ===== Reaction chips =====================================================
 
-func chipColors(selfReacted bool) reactionChipColors {
-	if selfReacted {
-		return reactionChipColors{
-			bg:     color.NRGBA{R: 122, G: 162, B: 247, A: 55},
-			stroke: color.NRGBA{R: 122, G: 162, B: 247, A: 180},
-			text:   color.NRGBA{R: 170, G: 200, B: 255, A: 240},
-		}
-	}
-	return reactionChipColors{
-		bg:     color.NRGBA{R: 120, G: 126, B: 146, A: 30},
-		stroke: color.NRGBA{R: 120, G: 126, B: 146, A: 70},
-		text:   color.NRGBA{R: 160, G: 170, B: 190, A: 230},
-	}
+// reactionChip is a Slack-style pill: rounded corners, hairline border,
+// tight padding, and hover affordance. Self-reacted variants use the
+// accent (blue) tint and a bold count.
+type reactionChip struct {
+	widget.BaseWidget
+	bg     *canvas.Rectangle
+	emoji  fyne.CanvasObject
+	count  *canvas.Text
+	onTap  func()
+	self   bool
+	hover  bool
 }
 
 func newReactionChip(reaction api.Reaction, selfUserID string, onTap func()) fyne.CanvasObject {
 	self := false
-	for _, u := range reaction.Users {
-		if strings.TrimSpace(u) != "" && strings.TrimSpace(u) == strings.TrimSpace(selfUserID) {
-			self = true
-			break
+	trimmedSelf := strings.TrimSpace(selfUserID)
+	if trimmedSelf != "" {
+		for _, u := range reaction.Users {
+			if strings.TrimSpace(u) == trimmedSelf {
+				self = true
+				break
+			}
 		}
 	}
-	colors := chipColors(self)
 
-	bg := canvas.NewRectangle(colors.bg)
-	bg.CornerRadius = 10
-	bg.StrokeColor = colors.stroke
+	bgCol := palette.ChipBG
+	strokeCol := palette.ChipBorder
+	textCol := palette.ChipText
+	if self {
+		bgCol = palette.ChipSelfBG
+		strokeCol = palette.ChipSelfBorder
+		textCol = palette.ChipSelfText
+	}
+
+	bg := canvas.NewRectangle(bgCol)
+	bg.CornerRadius = 12
+	bg.StrokeColor = strokeCol
 	bg.StrokeWidth = 1
 
 	emoji := newReactionEmojiView(reaction.Name)
-	count := canvas.NewText(fmt.Sprintf(" %d", reaction.Count), colors.text)
+	count := canvas.NewText(fmt.Sprintf("%d", reaction.Count), textCol)
 	count.TextSize = reactionCountTextSize()
 	count.TextStyle = fyne.TextStyle{Bold: self}
 
-	inner := container.NewHBox(emoji, count)
-	padded := container.NewBorder(
-		nil, nil,
-		fixedWidthSpacer(8), fixedWidthSpacer(8),
-		container.NewPadded(inner),
-	)
-	chip := container.NewStack(bg, padded)
-	if onTap == nil {
-		return chip
+	c := &reactionChip{
+		bg:    bg,
+		emoji: emoji,
+		count: count,
+		onTap: onTap,
+		self:  self,
 	}
-	return newTapWrap(chip, onTap)
+	c.ExtendBaseWidget(c)
+	return c
 }
 
+func (c *reactionChip) CreateRenderer() fyne.WidgetRenderer {
+	return &reactionChipRenderer{chip: c}
+}
+
+func (c *reactionChip) Tapped(_ *fyne.PointEvent)          { if c.onTap != nil { c.onTap() } }
+func (c *reactionChip) TappedSecondary(_ *fyne.PointEvent) {}
+func (c *reactionChip) Cursor() desktop.Cursor             { return desktop.PointerCursor }
+func (c *reactionChip) MouseIn(_ *desktop.MouseEvent) {
+	c.hover = true
+	c.applyHoverTint()
+}
+func (c *reactionChip) MouseOut() {
+	c.hover = false
+	c.applyHoverTint()
+}
+func (c *reactionChip) MouseMoved(_ *desktop.MouseEvent) {}
+
+func (c *reactionChip) applyHoverTint() {
+	if c.hover {
+		c.bg.StrokeColor = mixColor(c.bg.StrokeColor, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, 0.18)
+	} else if c.self {
+		c.bg.StrokeColor = palette.ChipSelfBorder
+	} else {
+		c.bg.StrokeColor = palette.ChipBorder
+	}
+	c.bg.Refresh()
+}
+
+// reactionChipRenderer lays out [emoji][gap][count] inside the rounded
+// background with consistent horizontal/vertical padding.
+type reactionChipRenderer struct{ chip *reactionChip }
+
+const (
+	chipPadX   = float32(7)
+	chipPadY   = float32(2)
+	chipInnerG = float32(4)
+	chipMinH   = float32(22)
+)
+
+func (r *reactionChipRenderer) MinSize() fyne.Size {
+	em := r.chip.emoji.MinSize()
+	ct := r.chip.count.MinSize()
+	h := em.Height
+	if ct.Height > h {
+		h = ct.Height
+	}
+	if h < chipMinH-2*chipPadY {
+		h = chipMinH - 2*chipPadY
+	}
+	w := chipPadX*2 + em.Width + chipInnerG + ct.Width
+	return fyne.NewSize(w, h+chipPadY*2)
+}
+
+func (r *reactionChipRenderer) Layout(size fyne.Size) {
+	r.chip.bg.Move(fyne.NewPos(0, 0))
+	r.chip.bg.Resize(size)
+
+	em := r.chip.emoji.MinSize()
+	ct := r.chip.count.MinSize()
+	inner := size.Height - 2*chipPadY
+	// vertically center each
+	emY := chipPadY + (inner-em.Height)/2
+	ctY := chipPadY + (inner-ct.Height)/2
+
+	r.chip.emoji.Move(fyne.NewPos(chipPadX, emY))
+	r.chip.emoji.Resize(em)
+	r.chip.count.Move(fyne.NewPos(chipPadX+em.Width+chipInnerG, ctY))
+	r.chip.count.Resize(ct)
+}
+
+func (r *reactionChipRenderer) Refresh() {
+	r.chip.bg.Refresh()
+	r.chip.emoji.Refresh()
+	r.chip.count.Refresh()
+}
+
+func (r *reactionChipRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{r.chip.bg, r.chip.emoji, r.chip.count}
+}
+
+func (r *reactionChipRenderer) Destroy() {}
+
+// ===== Add-reaction button ===============================================
+
+// newAddReactionButton renders Slack's "+ smile" affordance: a small,
+// outline-only chip that visually defers to existing reactions.
 func newAddReactionButton(win fyne.Window, onPicked func(name string)) fyne.CanvasObject {
 	if onPicked == nil {
 		return nil
 	}
-	bg := canvas.NewRectangle(color.NRGBA{R: 120, G: 126, B: 146, A: 22})
-	bg.CornerRadius = 10
-	bg.StrokeColor = color.NRGBA{R: 120, G: 126, B: 146, A: 55}
+	bg := canvas.NewRectangle(palette.ChipAddBG)
+	bg.CornerRadius = 12
+	bg.StrokeColor = palette.ChipAddBorder
 	bg.StrokeWidth = 1
 
-	plus := canvas.NewText("+", color.NRGBA{R: 160, G: 170, B: 190, A: 230})
-	plus.TextSize = reactionCountTextSize() + 2
+	plus := canvas.NewText("＋", palette.ChipAddText)
+	plus.TextSize = reactionCountTextSize() + 1
 	plus.TextStyle = fyne.TextStyle{Bold: true}
 	plus.Alignment = fyne.TextAlignCenter
 
-	padded := container.NewBorder(
-		nil, nil,
-		fixedWidthSpacer(8), fixedWidthSpacer(8),
-		container.NewPadded(plus),
-	)
-	chip := container.NewStack(bg, padded)
-	return newTapWrap(chip, func() {
-		showEmojiPicker(win, onPicked)
-	})
+	btn := &addReactionBtn{bg: bg, plus: plus, onTap: func() { showEmojiPicker(win, onPicked) }}
+	btn.ExtendBaseWidget(btn)
+	return btn
 }
 
-// commonReactionEmojis is the default "recent / popular" strip shown when
-// the search field is empty.
+type addReactionBtn struct {
+	widget.BaseWidget
+	bg    *canvas.Rectangle
+	plus  *canvas.Text
+	onTap func()
+	hover bool
+}
+
+func (b *addReactionBtn) CreateRenderer() fyne.WidgetRenderer {
+	return &addReactionBtnRenderer{btn: b}
+}
+func (b *addReactionBtn) Tapped(_ *fyne.PointEvent)          { if b.onTap != nil { b.onTap() } }
+func (b *addReactionBtn) TappedSecondary(_ *fyne.PointEvent) {}
+func (b *addReactionBtn) Cursor() desktop.Cursor             { return desktop.PointerCursor }
+func (b *addReactionBtn) MouseIn(_ *desktop.MouseEvent) {
+	b.hover = true
+	b.bg.FillColor = palette.ThreadHoverBG
+	b.bg.StrokeColor = mixColor(palette.ChipAddBorder, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, 0.4)
+	b.bg.Refresh()
+}
+func (b *addReactionBtn) MouseOut() {
+	b.hover = false
+	b.bg.FillColor = palette.ChipAddBG
+	b.bg.StrokeColor = palette.ChipAddBorder
+	b.bg.Refresh()
+}
+func (b *addReactionBtn) MouseMoved(_ *desktop.MouseEvent) {}
+
+type addReactionBtnRenderer struct{ btn *addReactionBtn }
+
+func (r *addReactionBtnRenderer) MinSize() fyne.Size {
+	// Square-ish, matches reaction chip height.
+	h := chipMinH
+	return fyne.NewSize(h + 6, h)
+}
+func (r *addReactionBtnRenderer) Layout(size fyne.Size) {
+	r.btn.bg.Move(fyne.NewPos(0, 0))
+	r.btn.bg.Resize(size)
+	ps := r.btn.plus.MinSize()
+	r.btn.plus.Move(fyne.NewPos((size.Width-ps.Width)/2, (size.Height-ps.Height)/2))
+	r.btn.plus.Resize(ps)
+}
+func (r *addReactionBtnRenderer) Refresh()                     { r.btn.bg.Refresh(); r.btn.plus.Refresh() }
+func (r *addReactionBtnRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.btn.bg, r.btn.plus} }
+func (r *addReactionBtnRenderer) Destroy()                     {}
+
+// ===== Color helpers =====================================================
+
+func mixColor(a color.Color, b color.Color, t float32) color.NRGBA {
+	ar, ag, ab, aa := nrgba(a)
+	br, bg, bb, _ := nrgba(b)
+	if t < 0 {
+		t = 0
+	}
+	if t > 1 {
+		t = 1
+	}
+	lerp := func(x, y uint8) uint8 { return uint8(float32(x)*(1-t) + float32(y)*t) }
+	return color.NRGBA{R: lerp(ar, br), G: lerp(ag, bg), B: lerp(ab, bb), A: aa}
+}
+
+func nrgba(c color.Color) (uint8, uint8, uint8, uint8) {
+	if n, ok := c.(color.NRGBA); ok {
+		return n.R, n.G, n.B, n.A
+	}
+	r, g, b, a := c.RGBA()
+	return uint8(r >> 8), uint8(g >> 8), uint8(b >> 8), uint8(a >> 8)
+}
+
+// ===== Emoji picker ======================================================
+
 var commonReactionEmojis = []string{
 	"+1", "-1", "joy", "heart", "fire", "tada",
 	"eyes", "raised_hands", "pray", "rocket",
 	"thinking_face", "white_check_mark",
 }
 
-const emojiPickerMaxResults = 60
-const emojiPickerColumns = 8
+const emojiPickerMaxResults = 80
+const emojiPickerColumns = 9
 
-// emojiNameIndex caches the sorted list of all known emoji shortcodes
-// (standard + workspace) so the live filter doesn't re-walk the maps on
-// every keystroke. It's rebuilt lazily and after workspace emoji updates.
 var (
 	emojiNamesCache    []string
-	emojiNamesCacheKey int // bumped when workspace map changes
+	emojiNamesCacheKey int
 )
 
 func allEmojiNames() []string {
-	// Standard names always present; workspace names depend on the workspace
-	// map, which can be swapped. We rebuild whenever the workspace map size
-	// changes — cheap enough for a few thousand entries.
 	workspaceEmojiMu.RLock()
 	wsCount := len(workspaceEmojiURLByKey) + len(workspaceEmojiAliasByKey)
 	workspaceEmojiMu.RUnlock()
@@ -149,15 +294,10 @@ func allEmojiNames() []string {
 	return out
 }
 
-// filterEmojiNames returns up to maxResults shortcodes matching the query.
-// Ranking prefers exact matches, then prefix, then substring; results are
-// otherwise alphabetical so the grid order is stable.
 func filterEmojiNames(query string, maxResults int) []string {
 	q := strings.ToLower(strings.Trim(strings.TrimSpace(query), ":"))
 	all := allEmojiNames()
 	if q == "" {
-		// Default view: the curated quick-picks first, then alphabetical
-		// fill from the full index so the grid never looks empty.
 		out := make([]string, 0, maxResults)
 		seen := map[string]bool{}
 		for _, name := range commonReactionEmojis {
@@ -193,8 +333,6 @@ func filterEmojiNames(query string, maxResults int) []string {
 		case strings.Contains(lower, q):
 			rank = 2
 		default:
-			// Also try matching against the unicode glyph itself, so
-			// pasting an emoji character into the search finds it.
 			if u, ok := slackEmojiUnicode[name]; ok && strings.Contains(u, query) {
 				rank = 3
 			}
@@ -220,8 +358,79 @@ func filterEmojiNames(query string, maxResults int) []string {
 	return out
 }
 
-// showEmojiPicker opens a dialog with a live-filtered emoji grid. Typing
-// in the search field re-renders the grid; Enter picks the first result.
+// pickerCell renders a single emoji button with hover background and a
+// name label that surfaces on hover (Slack's emoji picker shows the
+// shortcode in a footer; we keep the label inside the cell as a tooltip).
+type pickerCell struct {
+	widget.BaseWidget
+	bg     *canvas.Rectangle
+	emoji  fyne.CanvasObject
+	name   string
+	onTap  func()
+	onHover func(string)
+}
+
+func newPickerCell(name string, onTap func(), onHover func(string)) *pickerCell {
+	bg := canvas.NewRectangle(palette.PickerCellBG)
+	bg.CornerRadius = 6
+	c := &pickerCell{
+		bg:     bg,
+		emoji:  newReactionEmojiView(name),
+		name:   name,
+		onTap:  onTap,
+		onHover: onHover,
+	}
+	c.ExtendBaseWidget(c)
+	return c
+}
+
+func (c *pickerCell) CreateRenderer() fyne.WidgetRenderer {
+	return &pickerCellRenderer{cell: c}
+}
+func (c *pickerCell) Tapped(_ *fyne.PointEvent)          { if c.onTap != nil { c.onTap() } }
+func (c *pickerCell) TappedSecondary(_ *fyne.PointEvent) {}
+func (c *pickerCell) Cursor() desktop.Cursor             { return desktop.PointerCursor }
+func (c *pickerCell) MouseIn(_ *desktop.MouseEvent) {
+	c.bg.FillColor = palette.PickerHoverBG
+	c.bg.Refresh()
+	if c.onHover != nil {
+		c.onHover(c.name)
+	}
+}
+func (c *pickerCell) MouseOut() {
+	c.bg.FillColor = palette.PickerCellBG
+	c.bg.Refresh()
+	if c.onHover != nil {
+		c.onHover("")
+	}
+}
+func (c *pickerCell) MouseMoved(_ *desktop.MouseEvent) {}
+
+type pickerCellRenderer struct{ cell *pickerCell }
+
+func (r *pickerCellRenderer) MinSize() fyne.Size {
+	s := r.cell.emoji.MinSize()
+	side := s.Width
+	if s.Height > side {
+		side = s.Height
+	}
+	side += 12
+	if side < 34 {
+		side = 34
+	}
+	return fyne.NewSize(side, side)
+}
+func (r *pickerCellRenderer) Layout(size fyne.Size) {
+	r.cell.bg.Move(fyne.NewPos(0, 0))
+	r.cell.bg.Resize(size)
+	s := r.cell.emoji.MinSize()
+	r.cell.emoji.Move(fyne.NewPos((size.Width-s.Width)/2, (size.Height-s.Height)/2))
+	r.cell.emoji.Resize(s)
+}
+func (r *pickerCellRenderer) Refresh()                     { r.cell.bg.Refresh(); r.cell.emoji.Refresh() }
+func (r *pickerCellRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.cell.bg, r.cell.emoji} }
+func (r *pickerCellRenderer) Destroy()                     {}
+
 func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 	if win == nil {
 		return
@@ -230,8 +439,12 @@ func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 	current := filterEmojiNames("", emojiPickerMaxResults)
 
 	grid := container.NewGridWithColumns(emojiPickerColumns)
-	status := canvas.NewText("", color.NRGBA{R: 150, G: 158, B: 178, A: 200})
+	status := canvas.NewText("", palette.MetaText)
 	status.TextSize = reactionCountTextSize()
+
+	hoverLabel := canvas.NewText("Pick an emoji", palette.MetaTextStrong)
+	hoverLabel.TextSize = reactionCountTextSize() + 1
+	hoverLabel.TextStyle = fyne.TextStyle{Bold: true}
 
 	pick := func(name string) {
 		clean := strings.Trim(strings.TrimSpace(name), ":")
@@ -244,14 +457,21 @@ func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 		}
 	}
 
+	setHover := func(name string) {
+		if strings.TrimSpace(name) == "" {
+			hoverLabel.Text = "Pick an emoji"
+		} else {
+			hoverLabel.Text = ":" + name + ":"
+		}
+		hoverLabel.Refresh()
+	}
+
 	rebuild := func(names []string) {
 		current = names
 		grid.Objects = grid.Objects[:0]
 		for _, name := range names {
 			n := name
-			emoji := newReactionEmojiView(n)
-			cell := container.NewPadded(container.NewCenter(emoji))
-			grid.Objects = append(grid.Objects, newTapWrap(cell, func() { pick(n) }))
+			grid.Objects = append(grid.Objects, newPickerCell(n, func() { pick(n) }, setHover))
 		}
 		grid.Refresh()
 		if len(names) == 0 {
@@ -278,11 +498,13 @@ func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 	rebuild(current)
 
 	scrollGrid := container.NewVScroll(grid)
-	scrollGrid.SetMinSize(fyne.NewSize(380, 260))
+	scrollGrid.SetMinSize(fyne.NewSize(420, 300))
+
+	footer := container.NewBorder(nil, nil, hoverLabel, status, nil)
 
 	body := container.NewBorder(
-		container.NewVBox(entry, status),
-		nil, nil, nil,
+		entry,
+		footer, nil, nil,
 		scrollGrid,
 	)
 
@@ -292,9 +514,8 @@ func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 		}
 		pick(entry.Text)
 	}, win)
-	form.Resize(fyne.NewSize(420, 380))
+	form.Resize(fyne.NewSize(470, 430))
 	form.Show()
-	// Focus the search field so the user can start typing immediately.
 	if c := win.Canvas(); c != nil {
 		c.Focus(entry)
 	}
