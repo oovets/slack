@@ -539,7 +539,7 @@ func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 		}
 		pick(entry.Text)
 	}, win)
-	form.Resize(fyne.NewSize(470, 430))
+	form.Resize(fyne.NewSize(320, 320))
 	form.Show()
 	if c := win.Canvas(); c != nil {
 		c.Focus(entry)
