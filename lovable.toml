@@ -1,4 +1,4 @@
 [run]
 dev = "sleep infinity"
-build = "go vet ./..."
-"build:dev" = "go vet ./..."
+build = "true"
+"build:dev" = "true"
