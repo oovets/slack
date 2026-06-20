@@ -22,6 +22,7 @@ type messageRenderCtx struct {
 	selfUserID     string
 	showTimestamps bool
 	inThreadView   bool
+	win            fyne.Window
 	onThread       func(api.Message)
 	onReply        func(api.Message)
 	onMedia        func(api.File)
