@@ -62,12 +62,13 @@ const (
 
 // Section keys for the sidebar channel list.
 const (
-	sectionNew     = "new"
-	sectionThreads = "threads"
-	sectionDMs     = "dms"
-	sectionGroups  = "groups"
-	sectionRooms   = "rooms"
-	sectionBots    = "bots"
+	sectionFavorites = "favorites"
+	sectionNew       = "new"
+	sectionThreads   = "threads"
+	sectionDMs       = "dms"
+	sectionGroups    = "groups"
+	sectionRooms     = "rooms"
+	sectionBots      = "bots"
 )
 
 // Timing constants for scroll-to-bottom retries after layout changes.
@@ -777,45 +778,57 @@ func (a *App) rebuildFilteredChannels() {
 	})
 
 	a.listItems = a.listItems[:0]
-	appendSectionHeader := func(title string) {
-		a.listItems = append(a.listItems, chatListItem{header: title, sectionKey: ""})
+	appendSectionHeader := func(section, title string, count int) {
+		a.listItems = append(a.listItems, chatListItem{
+			header:     a.sectionHeaderLabel(section, title, count),
+			sectionKey: section,
+		})
 	}
-	appendChannels := func(items []api.Channel) {
+	appendChannels := func(section string, items []api.Channel) {
+		if a.isSectionCollapsed(section) {
+			return
+		}
 		for i := range items {
 			ch := items[i]
 			a.listItems = append(a.listItems, chatListItem{channel: &ch})
 		}
 	}
-	if len(favorites) > 0 {
-		appendSectionHeader("Favorites")
-		appendChannels(favorites)
-	}
-	if len(newMsgs) > 0 {
-		appendSectionHeader("New")
-		appendChannels(newMsgs)
-	}
-	if len(rooms) > 0 {
-		appendSectionHeader("Channels")
-		appendChannels(rooms)
-	}
-	if len(threads) > 0 {
-		appendSectionHeader("Threads")
-		for i := range threads {
-			t := threads[i]
+	appendThreads := func(section string, items []threadListEntry) {
+		if a.isSectionCollapsed(section) {
+			return
+		}
+		for i := range items {
+			t := items[i]
 			a.listItems = append(a.listItems, chatListItem{thread: &t})
 		}
 	}
+	if len(favorites) > 0 {
+		appendSectionHeader(sectionFavorites, "Favorites", len(favorites))
+		appendChannels(sectionFavorites, favorites)
+	}
+	if len(newMsgs) > 0 {
+		appendSectionHeader(sectionNew, "New", len(newMsgs))
+		appendChannels(sectionNew, newMsgs)
+	}
+	if len(rooms) > 0 {
+		appendSectionHeader(sectionRooms, "Channels", len(rooms))
+		appendChannels(sectionRooms, rooms)
+	}
+	if len(threads) > 0 {
+		appendSectionHeader(sectionThreads, "Threads", len(threads))
+		appendThreads(sectionThreads, threads)
+	}
 	if len(dms) > 0 {
-		appendSectionHeader("Direct Messages")
-		appendChannels(dms)
+		appendSectionHeader(sectionDMs, "Direct Messages", len(dms))
+		appendChannels(sectionDMs, dms)
 	}
 	if len(groups) > 0 {
-		appendSectionHeader("Groups")
-		appendChannels(groups)
+		appendSectionHeader(sectionGroups, "Groups", len(groups))
+		appendChannels(sectionGroups, groups)
 	}
 	if len(bots) > 0 {
-		appendSectionHeader("Bots & Apps")
-		appendChannels(bots)
+		appendSectionHeader(sectionBots, "Bots & Apps", len(bots))
+		appendChannels(sectionBots, bots)
 	}
 	if len(a.listItems) == 0 {
 		a.listItems = append(a.listItems, chatListItem{header: "No chats match your search", sectionKey: ""})
@@ -954,27 +967,6 @@ func (a *App) saveFavoritesPreference() {
 
 func (a *App) channelHasUnread(ch api.Channel) bool {
 	return ch.UnreadCount > 0 || ch.HasUnread
-}
-
-func (a *App) sectionItemCount(section string) int {
-	for i, item := range a.listItems {
-		if item.channel != nil || item.thread != nil {
-			continue
-		}
-		if item.sectionKey != section {
-			continue
-		}
-		count := 0
-		for j := i + 1; j < len(a.listItems); j++ {
-			next := a.listItems[j]
-			if next.channel == nil && next.thread == nil {
-				break
-			}
-			count++
-		}
-		return count
-	}
-	return 0
 }
 
 func (a *App) chatBaseName(ch api.Channel) string {
@@ -1218,7 +1210,7 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 				}
 			}
 		}
-		p.setMessages(msgs, a.info.UserID, a.info.UserID, a.win, a.showTimestamps, a.appTheme.compactMode, func(m api.Message) {
+		p.setMessages(msgs, a.info.UserID, a.win, a.showTimestamps, a.appTheme.compactMode, func(m api.Message) {
 			a.openThreadInPane(p, m)
 		}, func(m api.Message) {
 			a.setReplyTarget(p, m)
@@ -1403,18 +1395,28 @@ func (a *App) sendFromPane(p *chatPane) {
 	if p == nil {
 		return
 	}
-	text := strings.TrimSpace(p.input.Text)
-	text = a.expandOutgoingMentions(text)
-	if text == "" || strings.TrimSpace(p.channelID) == "" {
+	if strings.TrimSpace(p.input.Text) == "" || strings.TrimSpace(p.channelID) == "" {
 		return
 	}
-	threadTS := p.threadTS
-	if p.replyTarget != nil {
-		threadTS = threadRootTS(*p.replyTarget)
+	sendCurrentText := func() error {
+		text := strings.TrimSpace(p.input.Text)
+		text = a.expandOutgoingMentions(text)
+		if text == "" {
+			return fmt.Errorf("message is empty")
+		}
+		channelID := strings.TrimSpace(p.channelID)
+		if channelID == "" {
+			return fmt.Errorf("no channel selected")
+		}
+		threadTS := p.threadTS
+		if p.replyTarget != nil {
+			threadTS = threadRootTS(*p.replyTarget)
+		}
+		return a.client.PostMessage(channelID, text, threadTS)
 	}
 	var retrySend func()
 	retrySend = func() {
-		if err := a.client.PostMessage(p.channelID, text, threadTS); err != nil {
+		if err := sendCurrentText(); err != nil {
 			dialog.ShowError(err, a.win)
 			a.setStatusWithAction("Send failed", "Retry send", retrySend)
 			return
@@ -1427,7 +1429,7 @@ func (a *App) sendFromPane(p *chatPane) {
 			a.loadMessagesForPane(p)
 		}()
 	}
-	if err := a.client.PostMessage(p.channelID, text, threadTS); err != nil {
+	if err := sendCurrentText(); err != nil {
 		if delay, rateLimited := retryDelayForError(err); rateLimited {
 			secs := int(delay / time.Second)
 			a.setStatusWithAction(
@@ -1827,10 +1829,7 @@ func (a *App) isSectionCollapsed(section string) bool {
 	}
 	collapsed, ok := a.sectionCollapsed[section]
 	if !ok {
-		if section == sectionNew {
-			return false
-		}
-		return true
+		return false
 	}
 	return collapsed
 }
@@ -2568,10 +2567,7 @@ func (a *App) setFont(family string) {
 
 func (a *App) refreshPanesForTheme() {
 	for _, p := range a.paneManager.allPanes() {
-		p.refreshForTheme()
-		if strings.TrimSpace(p.channelID) != "" {
-			go a.loadMessagesForPane(p)
-		}
+		p.refreshForTheme(a.showTimestamps, a.appTheme.compactMode)
 	}
 }
 

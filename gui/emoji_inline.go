@@ -62,9 +62,6 @@ func newMessageBody(rawText string, isFromMe bool) fyne.CanvasObject {
 	if !mightContainEmoji(text) && !mightContainEmoji(rawText) && !strings.Contains(text, "@") {
 		lbl := widget.NewLabel(text)
 		lbl.Wrapping = fyne.TextWrapWord
-		if isFromMe {
-			lbl.Alignment = fyne.TextAlignTrailing
-		}
 		return lbl
 	}
 
@@ -101,9 +98,6 @@ func newMessageBody(rawText string, isFromMe bool) fyne.CanvasObject {
 		return lbl
 	}
 	body := newWrapBox(objs)
-	if isFromMe {
-		return container.NewBorder(nil, nil, nil, nil, body)
-	}
 	return body
 }
 

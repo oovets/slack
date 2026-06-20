@@ -18,7 +18,6 @@ func trimEq(a, b string) bool {
 // messageRenderCtx carries the per-channel render inputs that renderMessageRow
 // needs but that don't vary message-to-message.
 type messageRenderCtx struct {
-	currentUserID  string
 	selfUserID     string
 	showTimestamps bool
 	inThreadView   bool
@@ -95,7 +94,7 @@ func newVirtualMessageList() *virtualMessageList {
 
 func (v *virtualMessageList) renderRow(i int) fyne.CanvasObject {
 	m := v.msgs[i]
-	isFromMe := trimEq(m.UserID, v.ctx.currentUserID)
+	isFromMe := trimEq(m.UserID, v.ctx.selfUserID)
 	showHeader := isFirstInSenderGroup(v.msgs, i)
 	return renderMessageRow(m, isFromMe, m.MentionedMe, v.ctx.selfUserID, v.ctx.win, v.ctx.showTimestamps, v.ctx.compact, v.ctx.onThread, v.ctx.onReply, v.ctx.onMedia, v.ctx.onReaction, v.ctx.fetchMedia, showHeader, v.ctx.inThreadView)
 }
@@ -113,6 +112,13 @@ func (v *virtualMessageList) setMessages(msgs []api.Message, ctx messageRenderCt
 
 func (v *virtualMessageList) clear() {
 	v.msgs = nil
+	v.heights = map[int]float32{}
+	v.list.Refresh()
+}
+
+func (v *virtualMessageList) refreshOptions(showTimestamps bool, compact bool) {
+	v.ctx.showTimestamps = showTimestamps
+	v.ctx.compact = compact
 	v.heights = map[int]float32{}
 	v.list.Refresh()
 }
