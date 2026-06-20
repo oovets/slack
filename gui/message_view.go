@@ -168,7 +168,7 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 	// Add a small breath of space above the first message in a sender group
 	// (Slack-native: sender clusters get ~8px of vertical separation).
 	if showHeader {
-		rowCanvas = container.NewVBox(fixedHeightSpacer(8), rowCanvas)
+		rowCanvas = container.NewVBox(fixedHeightSpacer(4), rowCanvas)
 	}
 	if !isFromMe && mentionedMe {
 		bg := canvas.NewRectangle(palette.MentionRowBG)
