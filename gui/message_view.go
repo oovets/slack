@@ -65,38 +65,37 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 		}
 		onThread(m)
 	}
+	// Compact thread bar (Slack-native): only when this message has replies
+	// and we're not already inside the thread view.
 	if !inThreadView && m.ReplyCount > 0 {
 		rowWithMeta.Add(alignOutgoingRow(newThreadReplyBar(m.ReplyCount, openThread), isFromMe))
 	}
-	if onReply != nil && (inThreadView || m.ReplyCount == 0) {
-		rowWithMeta.Add(alignOutgoingRow(newSubtleTapLabel("Reply in thread", func() {
-			onReply(m)
-		}), isFromMe))
-	}
-	// Reactions row: always show the "+" add button so users can react to
-	// any message, even ones that haven't received reactions yet.
-	if onReaction != nil || len(m.Reactions) > 0 {
-		reactionRow := container.NewHBox()
+	// Unified actions row: existing reactions + "+" add + reply icon, all
+	// on the same line. Keeps the message vertically tight.
+	if onReaction != nil || onReply != nil || len(m.Reactions) > 0 {
+		actionsRow := container.NewHBox()
 		for _, reaction := range m.Reactions {
 			r := reaction
 			var tap func()
 			if onReaction != nil {
 				tap = func() { onReaction(m, r.Name) }
 			}
-			reactionRow.Add(newReactionChip(r, selfUserID, tap))
+			actionsRow.Add(newReactionChip(r, selfUserID, tap))
 		}
 		if onReaction != nil {
-			addBtn := newAddReactionButton(win, func(name string) {
-				onReaction(m, name)
-			})
-			if addBtn != nil {
-				reactionRow.Add(addBtn)
+			if addBtn := newAddReactionButton(win, func(name string) { onReaction(m, name) }); addBtn != nil {
+				actionsRow.Add(addBtn)
 			}
 		}
-		if len(reactionRow.Objects) > 0 {
-			rowWithMeta.Add(alignOutgoingRow(reactionRow, isFromMe))
+		if onReply != nil {
+			actionsRow.Add(newIconActionButton("↩", "Reply in thread", func() { onReply(m) }))
+		}
+		if len(actionsRow.Objects) > 0 {
+			rowWithMeta.Add(alignOutgoingRow(actionsRow, isFromMe))
 		}
 	}
+
+
 
 	var content *fyne.Container
 	if showHeader {
