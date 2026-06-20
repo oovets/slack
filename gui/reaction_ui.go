@@ -156,95 +156,89 @@ func (r *reactionChipRenderer) Objects() []fyne.CanvasObject {
 
 func (r *reactionChipRenderer) Destroy() {}
 
-// ===== Add-reaction button ===============================================
+// ===== Icon action buttons ===============================================
 
-// newAddReactionButton renders Slack's "+ smile" affordance: a small,
-// outline-only chip that visually defers to existing reactions.
+// newAddReactionButton renders Slack's add-reaction affordance using the
+// theme's content-add icon: a compact, outline-only square that visually
+// defers to existing reaction chips.
 func newAddReactionButton(win fyne.Window, onPicked func(name string)) fyne.CanvasObject {
 	if onPicked == nil {
 		return nil
 	}
+	return newIconChipButton(theme.ContentAddIcon(), func() { showEmojiPicker(win, onPicked) })
+}
+
+// newIconActionButton renders a compact icon-only action chip (same
+// footprint as the add-reaction button) for actions like Reply that
+// belong on the same row as the reaction chips.
+//
+// glyph is ignored when iconRes is non-nil; callers should prefer the
+// resource overload below.
+func newIconActionButton(_glyph, _tooltip string, onTap func()) fyne.CanvasObject {
+	if onTap == nil {
+		return nil
+	}
+	return newIconChipButton(theme.MailReplyIcon(), onTap)
+}
+
+// newIconChipButton is the shared chip-shaped icon button used by the
+// add-reaction "+" and the inline "Reply" affordance.
+func newIconChipButton(res fyne.Resource, onTap func()) fyne.CanvasObject {
 	bg := canvas.NewRectangle(palette.ChipAddBG)
-	bg.CornerRadius = 12
+	bg.CornerRadius = 10
 	bg.StrokeColor = palette.ChipAddBorder
 	bg.StrokeWidth = 1
 
-	plus := canvas.NewText("＋", palette.ChipAddText)
-	plus.TextSize = reactionCountTextSize() + 1
-	plus.TextStyle = fyne.TextStyle{Bold: true}
-	plus.Alignment = fyne.TextAlignCenter
+	icon := canvas.NewImageFromResource(res)
+	icon.FillMode = canvas.ImageFillContain
+	icon.SetMinSize(fyne.NewSize(12, 12))
 
-	btn := &addReactionBtn{bg: bg, plus: plus, onTap: func() { showEmojiPicker(win, onPicked) }}
+	btn := &iconChipBtn{bg: bg, icon: icon, onTap: onTap}
 	btn.ExtendBaseWidget(btn)
 	return btn
 }
 
-type addReactionBtn struct {
+type iconChipBtn struct {
 	widget.BaseWidget
 	bg    *canvas.Rectangle
-	plus  *canvas.Text
+	icon  *canvas.Image
 	onTap func()
-	hover bool
 }
 
-func (b *addReactionBtn) CreateRenderer() fyne.WidgetRenderer {
-	return &addReactionBtnRenderer{btn: b}
-}
-func (b *addReactionBtn) Tapped(_ *fyne.PointEvent)          { if b.onTap != nil { b.onTap() } }
-func (b *addReactionBtn) TappedSecondary(_ *fyne.PointEvent) {}
-func (b *addReactionBtn) Cursor() desktop.Cursor             { return desktop.PointerCursor }
-func (b *addReactionBtn) MouseIn(_ *desktop.MouseEvent) {
-	b.hover = true
+func (b *iconChipBtn) CreateRenderer() fyne.WidgetRenderer { return &iconChipBtnRenderer{btn: b} }
+func (b *iconChipBtn) Tapped(_ *fyne.PointEvent)           { if b.onTap != nil { b.onTap() } }
+func (b *iconChipBtn) TappedSecondary(_ *fyne.PointEvent)  {}
+func (b *iconChipBtn) Cursor() desktop.Cursor              { return desktop.PointerCursor }
+func (b *iconChipBtn) MouseIn(_ *desktop.MouseEvent) {
 	b.bg.FillColor = palette.ThreadHoverBG
-	b.bg.StrokeColor = mixColor(palette.ChipAddBorder, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, 0.4)
+	b.bg.StrokeColor = mixColor(palette.ChipAddBorder, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, 0.45)
 	b.bg.Refresh()
 }
-func (b *addReactionBtn) MouseOut() {
-	b.hover = false
+func (b *iconChipBtn) MouseOut() {
 	b.bg.FillColor = palette.ChipAddBG
 	b.bg.StrokeColor = palette.ChipAddBorder
 	b.bg.Refresh()
 }
-func (b *addReactionBtn) MouseMoved(_ *desktop.MouseEvent) {}
+func (b *iconChipBtn) MouseMoved(_ *desktop.MouseEvent) {}
 
-type addReactionBtnRenderer struct{ btn *addReactionBtn }
+type iconChipBtnRenderer struct{ btn *iconChipBtn }
 
-func (r *addReactionBtnRenderer) MinSize() fyne.Size {
-	h := chipMinH
-	return fyne.NewSize(h + 2, h)
+func (r *iconChipBtnRenderer) MinSize() fyne.Size {
+	// Square chip, same height as reaction chips so they align on one row.
+	return fyne.NewSize(chipMinH+2, chipMinH+2*chipPadY)
 }
-func (r *addReactionBtnRenderer) Layout(size fyne.Size) {
+func (r *iconChipBtnRenderer) Layout(size fyne.Size) {
 	r.btn.bg.Move(fyne.NewPos(0, 0))
 	r.btn.bg.Resize(size)
-	ps := r.btn.plus.MinSize()
-	r.btn.plus.Move(fyne.NewPos((size.Width-ps.Width)/2, (size.Height-ps.Height)/2))
-	r.btn.plus.Resize(ps)
+	const iconSize float32 = 11
+	r.btn.icon.Move(fyne.NewPos((size.Width-iconSize)/2, (size.Height-iconSize)/2))
+	r.btn.icon.Resize(fyne.NewSize(iconSize, iconSize))
 }
-func (r *addReactionBtnRenderer) Refresh()                     { r.btn.bg.Refresh(); r.btn.plus.Refresh() }
-func (r *addReactionBtnRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.btn.bg, r.btn.plus} }
-func (r *addReactionBtnRenderer) Destroy()                     {}
+func (r *iconChipBtnRenderer) Refresh()                     { r.btn.bg.Refresh(); r.btn.icon.Refresh() }
+func (r *iconChipBtnRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.btn.bg, r.btn.icon} }
+func (r *iconChipBtnRenderer) Destroy()                     {}
 
-// newIconActionButton renders a compact icon-only action chip (same
-// footprint as the "+" reaction button) for actions like Reply that
-// belong on the same row as the reaction chips.
-func newIconActionButton(glyph, _tooltip string, onTap func()) fyne.CanvasObject {
-	if onTap == nil {
-		return nil
-	}
-	bg := canvas.NewRectangle(palette.ChipAddBG)
-	bg.CornerRadius = 12
-	bg.StrokeColor = palette.ChipAddBorder
-	bg.StrokeWidth = 1
 
-	icon := canvas.NewText(glyph, palette.ChipAddText)
-	icon.TextSize = reactionCountTextSize() + 1
-	icon.TextStyle = fyne.TextStyle{Bold: true}
-	icon.Alignment = fyne.TextAlignCenter
-
-	btn := &addReactionBtn{bg: bg, plus: icon, onTap: onTap}
-	btn.ExtendBaseWidget(btn)
-	return btn
-}
 
 
 // ===== Color helpers =====================================================
