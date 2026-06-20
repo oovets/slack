@@ -50,6 +50,10 @@ type chatPane struct {
 	headerLine  *canvas.Rectangle
 	headerTitle *canvas.Text
 	headerSub   *canvas.Text
+
+	// mention autocomplete
+	completer *mentionCompleter
+	mentionFn func(prefix string) []completionMatch
 }
 
 func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThread func(*chatPane), onCancelReply func(*chatPane), onResized func(*chatPane), onShortcut func(fyne.Shortcut) bool) *chatPane {
@@ -80,6 +84,12 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 		if onSend != nil {
 			onSend(p)
 		}
+	}
+	p.input.OnChanged = func(_ string) {
+		p.handleMentionChange()
+	}
+	p.input.onMentionKey = func(key *fyne.KeyEvent) bool {
+		return p.handleMentionKey(key)
 	}
 	p.replyLabel = widget.NewLabel("")
 	p.replyLabel.Wrapping = fyne.TextTruncate
@@ -339,4 +349,38 @@ func (p *chatPane) messageByTS(ts string) (api.Message, bool) {
 		return api.Message{}, false
 	}
 	return p.msgList.messageByTS(ts)
+}
+
+func (p *chatPane) handleMentionChange() {
+	if p.completer == nil || p.mentionFn == nil {
+		return
+	}
+	prefix, found := mentionPrefixAt(p.input.Text, p.input.CursorRow, p.input.CursorColumn)
+	if !found {
+		p.completer.hide()
+		return
+	}
+	matches := p.mentionFn(prefix)
+	p.completer.update(matches, p.input)
+}
+
+func (p *chatPane) handleMentionKey(key *fyne.KeyEvent) bool {
+	if p.completer == nil || !p.completer.isVisible() {
+		return false
+	}
+	switch key.Name {
+	case fyne.KeyUp:
+		p.completer.move(-1)
+		return true
+	case fyne.KeyDown:
+		p.completer.move(1)
+		return true
+	case fyne.KeyReturn, fyne.KeyEnter, fyne.KeyTab:
+		p.completer.confirm()
+		return true
+	case fyne.KeyEscape:
+		p.completer.hide()
+		return true
+	}
+	return false
 }

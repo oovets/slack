@@ -2,6 +2,7 @@ package gui
 
 import (
 	"image/color"
+	"regexp"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -11,14 +12,54 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+// mentionTokenRE matches @mention tokens in rendered message text.
+var mentionTokenRE = regexp.MustCompile(`@[a-zA-Z0-9._-]+`)
+
+// mentionTokenColor returns the text color for a @mention token.
+// @here / @channel / @everyone use amber; other @name mentions use blue.
+func mentionTokenColor(token string) color.Color {
+	switch strings.ToLower(strings.TrimPrefix(token, "@")) {
+	case "here", "channel", "everyone":
+		return color.Color(palette.MentionAmber)
+	}
+	return color.Color(palette.ThreadAccent)
+}
+
+// textChunk is a fragment of a text segment, optionally a @mention token.
+type textChunk struct {
+	text      string
+	isMention bool
+}
+
+// splitByMentionTokens splits text into plain-text and @mention pieces.
+func splitByMentionTokens(text string) []textChunk {
+	locs := mentionTokenRE.FindAllStringIndex(text, -1)
+	if len(locs) == 0 {
+		return []textChunk{{text: text}}
+	}
+	out := make([]textChunk, 0, len(locs)*2+1)
+	prev := 0
+	for _, loc := range locs {
+		if loc[0] > prev {
+			out = append(out, textChunk{text: text[prev:loc[0]]})
+		}
+		out = append(out, textChunk{text: text[loc[0]:loc[1]], isMention: true})
+		prev = loc[1]
+	}
+	if prev < len(text) {
+		out = append(out, textChunk{text: text[prev:]})
+	}
+	return out
+}
+
 // newMessageBody renders a Slack message body with inline emoji images
 // (standard + workspace) mixed with text. Falls back to a plain wrapping
-// label when the text contains no emoji shortcodes (cheap, perfect wrap).
+// label when the text contains no emoji shortcodes or @mentions (cheap path).
 func newMessageBody(rawText string, isFromMe bool) fyne.CanvasObject {
 	text := renderSlackTextNoEmoji(rawText)
-	// Fast path: nothing emoji-ish in here. Use a regular label which has
-	// built-in word-wrap and accurate MinSize for the virtual list.
-	if !mightContainEmoji(text) && !mightContainEmoji(rawText) {
+	// Fast path: nothing emoji-ish or mention-ish. Use a regular label which
+	// has built-in word-wrap and accurate MinSize for the virtual list.
+	if !mightContainEmoji(text) && !mightContainEmoji(rawText) && !strings.Contains(text, "@") {
 		lbl := widget.NewLabel(text)
 		lbl.Wrapping = fyne.TextWrapWord
 		if isFromMe {
@@ -29,24 +70,30 @@ func newMessageBody(rawText string, isFromMe bool) fyne.CanvasObject {
 
 	// Tokenize the original text into runs of text and emoji segments.
 	segments := tokenizeEmojiText(rawText)
-	// Convert each segment into one or more inline canvas objects (words +
-	// emoji images) and stack them in a wrap-flow container so the rendered
-	// row breaks naturally on width.
+	// Convert each segment into inline canvas objects. Text segments are
+	// further split on @mention tokens and word boundaries.
 	objs := make([]fyne.CanvasObject, 0, len(segments)*2)
 	for _, seg := range segments {
 		if seg.isEmoji {
 			objs = append(objs, newInlineEmoji(seg.name))
 			continue
 		}
-		// Split text into wordy chunks (word + trailing whitespace) so the
-		// wrap layout can break on natural boundaries.
-		for _, w := range splitInlineWords(seg.text) {
-			if w == "" {
+		for _, chunk := range splitByMentionTokens(seg.text) {
+			if chunk.isMention {
+				t := canvas.NewText(chunk.text, mentionTokenColor(chunk.text))
+				t.TextSize = inlineBodyTextSize()
+				t.TextStyle = fyne.TextStyle{Bold: true}
+				objs = append(objs, t)
 				continue
 			}
-			t := canvas.NewText(w, inlineBodyColor(isFromMe))
-			t.TextSize = inlineBodyTextSize()
-			objs = append(objs, t)
+			for _, w := range splitInlineWords(chunk.text) {
+				if w == "" {
+					continue
+				}
+				t := canvas.NewText(w, inlineBodyColor(isFromMe))
+				t.TextSize = inlineBodyTextSize()
+				objs = append(objs, t)
+			}
 		}
 	}
 	if len(objs) == 0 {
@@ -55,7 +102,6 @@ func newMessageBody(rawText string, isFromMe bool) fyne.CanvasObject {
 	}
 	body := newWrapBox(objs)
 	if isFromMe {
-		// right-align by wrapping in a border with leading spacer
 		return container.NewBorder(nil, nil, nil, nil, body)
 	}
 	return body

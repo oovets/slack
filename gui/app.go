@@ -91,14 +91,16 @@ const (
 // from the Fyne main goroutine (via fyne.Do) except paneReloadMu/paneReloadTimers
 // and realtimeMu/realtimeStop/realtimeRunning, which are protected by mutexes.
 type App struct {
-	client         *api.Client
-	info           *api.AuthInfo
-	appToken       string
-	users          map[string]string
-	userByHandle   map[string]string
-	userByID       map[string]string
-	userInfoByID   map[string]api.UserInfo
-	groupNameCache map[string]string
+	client           *api.Client
+	info             *api.AuthInfo
+	appToken         string
+	users            map[string]string
+	userByHandle     map[string]string
+	userByID         map[string]string
+	userHandleByID   map[string]string // reverse of userByHandle: id → handle
+	userInfoByID     map[string]api.UserInfo
+	groupNameCache   map[string]string
+	pendingUserFetches sync.Map // set of user IDs being lazily fetched
 
 	realtimeStop    chan struct{}
 	realtimeRunning bool
@@ -185,6 +187,7 @@ func New(c *api.Client, info *api.AuthInfo, appToken string) *App {
 		users:              map[string]string{},
 		userByHandle:       map[string]string{},
 		userByID:           map[string]string{},
+		userHandleByID:     map[string]string{},
 		userInfoByID:       map[string]api.UserInfo{},
 		groupNameCache:     map[string]string{},
 		paneReloadTimers:   map[int]*time.Timer{},
@@ -221,7 +224,7 @@ func (a *App) Run() {
 			a.focusPaneInput(p)
 		},
 		func() *chatPane {
-			return newChatPane(
+			p := newChatPane(
 				func(cp *chatPane) { a.paneManager.setFocus(cp) },
 				func(cp *chatPane) { a.sendFromPane(cp) },
 				func(cp *chatPane) { a.exitThreadInPane(cp) },
@@ -229,6 +232,8 @@ func (a *App) Run() {
 				func(cp *chatPane) { a.schedulePaneScrollToBottom(cp) },
 				a.handleInputShortcut,
 			)
+			a.initPaneMention(p)
+			return p
 		},
 	)
 	a.paneManager.setShowSeparators(a.showPaneSeparators)
@@ -1672,6 +1677,7 @@ func (a *App) restartRealtimeUpdates() {
 func (a *App) buildUserDirectory(dir []api.UserInfo) {
 	a.userByHandle = map[string]string{}
 	a.userByID = map[string]string{}
+	a.userHandleByID = map[string]string{}
 	a.userInfoByID = map[string]api.UserInfo{}
 	a.users = map[string]string{}
 	for _, u := range dir {
@@ -1692,7 +1698,9 @@ func (a *App) buildUserDirectory(dir []api.UserInfo) {
 			a.users[id] = display
 		}
 		if h := strings.TrimSpace(u.Username); h != "" {
-			a.userByHandle[strings.ToLower(h)] = id
+			lh := strings.ToLower(h)
+			a.userByHandle[lh] = id
+			a.userHandleByID[id] = lh
 		}
 	}
 }
@@ -1714,7 +1722,9 @@ func (a *App) dmDisplayName(userID string) string {
 	}
 	a.userInfoByID[id] = *info
 	if h := strings.TrimSpace(info.Username); h != "" {
-		a.userByHandle[strings.ToLower(h)] = id
+		lh := strings.ToLower(h)
+		a.userByHandle[lh] = id
+		a.userHandleByID[id] = lh
 	}
 	name := strings.TrimSpace(info.DisplayName)
 	if name == "" {
@@ -2119,7 +2129,104 @@ func (a *App) formatMentionsForDisplay(text string) string {
 				return "@" + inline
 			}
 		}
+		// Not in directory — queue a background fetch so next load resolves it.
+		a.lazyResolveUserID(id)
 		return "@" + id
+	})
+}
+
+// lazyResolveUserID fetches a user from the API in the background when their
+// ID isn't in the local directory. Prevents duplicate requests via sync.Map.
+func (a *App) lazyResolveUserID(id string) {
+	if _, loaded := a.pendingUserFetches.LoadOrStore(id, struct{}{}); loaded {
+		return
+	}
+	go func() {
+		info, err := a.client.UserInfo(id)
+		if err != nil || info == nil {
+			return // leave in pendingFetches so we don't retry every message load
+		}
+		fyne.Do(func() {
+			a.userInfoByID[id] = *info
+			if h := strings.TrimSpace(info.Username); h != "" {
+				lh := strings.ToLower(h)
+				a.userByHandle[lh] = id
+				a.userHandleByID[id] = lh
+			}
+			name := strings.TrimSpace(info.DisplayName)
+			if name == "" {
+				name = strings.TrimSpace(info.RealName)
+			}
+			if name == "" {
+				name = strings.TrimSpace(info.Username)
+			}
+			if name == "" {
+				return
+			}
+			if a.userByID[id] == name {
+				return // already resolved, no reload needed
+			}
+			a.userByID[id] = name
+			a.users[id] = name
+			// Reload panes to show the resolved display name.
+			for _, p := range a.paneManager.allPanes() {
+				if strings.TrimSpace(p.channelID) != "" {
+					go a.loadMessagesForPane(p)
+				}
+			}
+		})
+	}()
+}
+
+// mentionMatches returns autocomplete candidates whose handle or display name
+// starts with prefix (case-insensitive). Capped at 7 results.
+func (a *App) mentionMatches(prefix string) []completionMatch {
+	q := strings.ToLower(prefix)
+	out := make([]completionMatch, 0, 8)
+	seen := map[string]bool{}
+
+	for handle, id := range a.userByHandle {
+		if q != "" && !strings.HasPrefix(handle, q) {
+			continue
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		display := strings.TrimSpace(a.users[id])
+		label := "@" + handle
+		if display != "" {
+			label = "@" + handle + "  —  " + display
+		}
+		out = append(out, completionMatch{label: label, handle: handle})
+	}
+	// Also match by display name prefix.
+	for id, name := range a.userByID {
+		if seen[id] {
+			continue
+		}
+		if q != "" && !strings.HasPrefix(strings.ToLower(name), q) {
+			continue
+		}
+		handle := a.userHandleByID[id]
+		if handle == "" {
+			continue
+		}
+		seen[id] = true
+		out = append(out, completionMatch{label: "@" + handle + "  —  " + name, handle: handle})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].handle < out[j].handle })
+	if len(out) > 7 {
+		out = out[:7]
+	}
+	return out
+}
+
+// initPaneMention wires up the @mention autocompleter for a newly created pane.
+func (a *App) initPaneMention(p *chatPane) {
+	p.mentionFn = a.mentionMatches
+	p.completer = newMentionCompleter(a.win.Canvas(), func(handle string) {
+		applyMentionCompletion(p.input, handle)
 	})
 }
 
@@ -2482,7 +2589,7 @@ func (a *App) applyInitialOpen() {
 }
 
 func (a *App) newPane() *chatPane {
-	return newChatPane(
+	p := newChatPane(
 		func(cp *chatPane) { a.paneManager.setFocus(cp) },
 		func(cp *chatPane) { a.sendFromPane(cp) },
 		func(cp *chatPane) { a.exitThreadInPane(cp) },
@@ -2490,6 +2597,8 @@ func (a *App) newPane() *chatPane {
 		func(cp *chatPane) { a.schedulePaneScrollToBottom(cp) },
 		a.handleInputShortcut,
 	)
+	a.initPaneMention(p)
+	return p
 }
 
 func (a *App) focusPaneInput(p *chatPane) {

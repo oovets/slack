@@ -345,10 +345,11 @@ func (e *quickSwitchEntry) TypedShortcut(shortcut fyne.Shortcut) {
 // Escape (to exit threads / cancel reply) and Ctrl shortcuts.
 type focusEntry struct {
 	widget.Entry
-	onFocused  func()
-	onShortcut func(fyne.Shortcut) bool
-	onEscape   func()
-	focused    bool
+	onFocused    func()
+	onShortcut   func(fyne.Shortcut) bool
+	onEscape     func()
+	onMentionKey func(*fyne.KeyEvent) bool // intercepts keys while mention popup is open
+	focused      bool
 }
 
 func newFocusEntry(onFocused func(), onShortcut func(fyne.Shortcut) bool, onEscape func()) *focusEntry {
@@ -443,6 +444,12 @@ func (e *focusEntry) TypedShortcut(shortcut fyne.Shortcut) {
 }
 
 func (e *focusEntry) TypedKey(key *fyne.KeyEvent) {
+	// Let the mention popup intercept navigation keys first.
+	if key != nil && e.onMentionKey != nil {
+		if e.onMentionKey(key) {
+			return
+		}
+	}
 	if key != nil && key.Name == fyne.KeyEscape {
 		if e.onEscape != nil {
 			e.onEscape()
