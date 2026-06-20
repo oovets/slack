@@ -145,9 +145,8 @@ type App struct {
 	showImagePreviews        bool
 	showFormatBar            bool
 
-	workspaceNames      []string
-	workspaceConfigPath string
-	workspaceSwitchFn   func(int)
+	workspaceNames     []string
+	workspaceResolveFn func(idx int) (*api.Client, *api.AuthInfo, string, error)
 
 	paneManager *paneManager
 
@@ -220,14 +219,13 @@ func (a *App) SetInitialOpen(channelID, threadTS string) {
 	a.initialThreadTS = strings.TrimSpace(threadTS)
 }
 
-// SetWorkspaces provides the list of available workspace names, the path to
-// the config file, and a callback invoked when the user picks a new workspace.
-// The callback should update the config file and relaunch the process; the App
-// will call Quit() after invoking it.
-func (a *App) SetWorkspaces(names []string, configPath string, switchFn func(int)) {
+// SetWorkspaces provides the list of available workspace names and a credential
+// resolver called when the user picks a workspace. The resolver returns a ready
+// api.Client, AuthInfo, and app-token for the chosen workspace; the App handles
+// all reconnection in-place without relaunching the process.
+func (a *App) SetWorkspaces(names []string, resolveFn func(idx int) (*api.Client, *api.AuthInfo, string, error)) {
 	a.workspaceNames = names
-	a.workspaceConfigPath = configPath
-	a.workspaceSwitchFn = switchFn
+	a.workspaceResolveFn = resolveFn
 }
 
 func (a *App) Run() {
@@ -297,15 +295,13 @@ func (a *App) Run() {
 		a.savePaneLayoutState()
 	})
 
-	if err := a.loadInitialData(); err != nil {
-		dialog.ShowError(err, a.win)
-	}
-	a.setStatusTemporary("Ready", 2*time.Second)
-	a.applyInitialOpen()
-	a.refreshPaneTitles()
-	// Delay realtime startup slightly to avoid competing with initial full loads.
-	time.AfterFunc(realtimeStartupDelay, func() {
-		a.startRealtimeUpdates()
+	// Start data loading in the background so the window appears immediately.
+	go a.loadInitialDataAsync(func() {
+		a.applyInitialOpen()
+		a.refreshPaneTitles()
+		time.AfterFunc(realtimeStartupDelay, func() {
+			a.startRealtimeUpdates()
+		})
 	})
 	a.win.ShowAndRun()
 }
@@ -628,10 +624,13 @@ func sidebarHSpacer(width float32) fyne.CanvasObject {
 	return r
 }
 
-func (a *App) loadInitialData() error {
-	a.setStatus("Loading channels...")
+// loadInitialDataAsync fires all startup API calls in background goroutines so
+// the window can show immediately. All UI updates are dispatched via fyne.Do.
+// onDone is called on the Fyne main goroutine after data is applied; pass nil
+// if no post-load callback is needed.
+func (a *App) loadInitialDataAsync(onDone func()) {
+	fyne.Do(func() { a.setStatus("Loading channels...") })
 
-	// Run all three independent startup API calls in parallel.
 	type userDirResult struct {
 		dir []api.UserInfo
 		err error
@@ -651,83 +650,86 @@ func (a *App) loadInitialData() error {
 	go func() { m, err := a.client.EmojiList(); emCh <- emojiResult{m, err} }()
 	go func() { ch, err := a.client.ListChannels(200); chCh <- channelsResult{ch, err} }()
 
+	// Wait for all three in this background goroutine — does not block the UI.
 	udRes := <-udCh
-	if udRes.err != nil {
-		log.Printf("[SLACK-GUI] users directory failed: %v", udRes.err)
-	} else {
-		a.buildUserDirectory(udRes.dir)
-	}
-
 	emRes := <-emCh
-	emojiNotice := ""
-	if emRes.err != nil {
-		if strings.Contains(strings.ToLower(emRes.err.Error()), "missing_scope") {
-			log.Printf("[SLACK-GUI] emoji.list unavailable: missing scope. Add emoji:read in Slack app OAuth & Permissions and reinstall app.")
-			emojiNotice = "emoji.list saknas (emoji:read)"
-		} else {
-			log.Printf("[SLACK-GUI] emoji.list failed: %v", emRes.err)
-			emojiNotice = "emoji.list fel"
-		}
-	} else {
-		setWorkspaceEmojiMap(emRes.m)
-	}
-
 	chRes := <-chCh
-	if chRes.err != nil {
-		return chRes.err
-	}
-	channels := chRes.channels
-	sort.Slice(channels, func(i, j int) bool {
-		return strings.ToLower(channels[i].Name) < strings.ToLower(channels[j].Name)
-	})
-	a.channels = channels
-	a.channelByID = map[string]api.Channel{}
-	for _, ch := range channels {
-		a.channelByID[ch.ID] = ch
-	}
-	a.refreshChannelDisplayNames()
-	a.resolveGroupNamesInBackground()
-	// refreshRecentThreads makes up to 24 ChannelHistory API calls. Run it in
-	// the background so startup is not blocked. The sidebar shows immediately
-	// without threads; a second rebuildFilteredChannels follows on completion.
-	// All shared state is snapshotted here on the main goroutine to avoid races.
-	{
-		chanSnap := append([]api.Channel(nil), a.channels...)
-		userSnap := a.snapshotUsers()
-		labelSnap := make(map[string]string, len(a.channels))
-		for _, ch := range a.channels {
-			labelSnap[ch.ID] = a.chatListLabel(ch)
-		}
-		go func() {
-			entries := a.computeRecentThreads(chanSnap, userSnap, labelSnap)
-			fyne.Do(func() {
-				a.recentThreads = entries
-				a.rebuildFilteredChannels()
-			})
-		}()
-	}
-	a.rebuildFilteredChannels()
 
-	for _, p := range a.paneManager.allPanes() {
-		if strings.TrimSpace(p.channelID) != "" {
-			go a.loadMessagesForPane(p)
+	fyne.Do(func() {
+		if udRes.err != nil {
+			log.Printf("[SLACK-GUI] users directory failed: %v", udRes.err)
+		} else {
+			a.buildUserDirectory(udRes.dir)
 		}
-	}
-	if idx := a.firstSelectableListIndex(); idx >= 0 {
-		a.isProgrammaticListSelect = true
-		a.channelList.Select(idx)
-		a.isProgrammaticListSelect = false
-		item := a.listItems[idx]
-		if item.channel != nil {
-			a.setSelectedSidebarChannel(item.channel.ID)
+
+		emojiNotice := ""
+		if emRes.err != nil {
+			if strings.Contains(strings.ToLower(emRes.err.Error()), "missing_scope") {
+				log.Printf("[SLACK-GUI] emoji.list unavailable: missing scope. Add emoji:read in Slack app OAuth & Permissions and reinstall app.")
+				emojiNotice = "emoji.list saknas (emoji:read)"
+			} else {
+				log.Printf("[SLACK-GUI] emoji.list failed: %v", emRes.err)
+				emojiNotice = "emoji.list fel"
+			}
+		} else {
+			setWorkspaceEmojiMap(emRes.m)
 		}
-	}
-	if strings.TrimSpace(emojiNotice) != "" {
-		a.setStatusTemporary("Channels loaded · "+emojiNotice, 6*time.Second)
-	} else {
-		a.setStatusTemporary("Channels loaded", 2*time.Second)
-	}
-	return nil
+
+		if chRes.err != nil {
+			dialog.ShowError(chRes.err, a.win)
+			return
+		}
+		channels := chRes.channels
+		sort.Slice(channels, func(i, j int) bool {
+			return strings.ToLower(channels[i].Name) < strings.ToLower(channels[j].Name)
+		})
+		a.channels = channels
+		a.channelByID = map[string]api.Channel{}
+		for _, ch := range channels {
+			a.channelByID[ch.ID] = ch
+		}
+		a.refreshChannelDisplayNames()
+		a.resolveGroupNamesInBackground()
+		{
+			chanSnap := append([]api.Channel(nil), a.channels...)
+			userSnap := a.snapshotUsers()
+			labelSnap := make(map[string]string, len(a.channels))
+			for _, ch := range a.channels {
+				labelSnap[ch.ID] = a.chatListLabel(ch)
+			}
+			go func() {
+				entries := a.computeRecentThreads(chanSnap, userSnap, labelSnap)
+				fyne.Do(func() {
+					a.recentThreads = entries
+					a.rebuildFilteredChannels()
+				})
+			}()
+		}
+		a.rebuildFilteredChannels()
+
+		for _, p := range a.paneManager.allPanes() {
+			if strings.TrimSpace(p.channelID) != "" {
+				go a.loadMessagesForPane(p)
+			}
+		}
+		if idx := a.firstSelectableListIndex(); idx >= 0 {
+			a.isProgrammaticListSelect = true
+			a.channelList.Select(idx)
+			a.isProgrammaticListSelect = false
+			item := a.listItems[idx]
+			if item.channel != nil {
+				a.setSelectedSidebarChannel(item.channel.ID)
+			}
+		}
+		if strings.TrimSpace(emojiNotice) != "" {
+			a.setStatusTemporary("Channels loaded · "+emojiNotice, 6*time.Second)
+		} else {
+			a.setStatusTemporary("Channels loaded", 2*time.Second)
+		}
+		if onDone != nil {
+			onDone()
+		}
+	})
 }
 
 func (a *App) refreshRecentThreads() {
@@ -1383,9 +1385,17 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 			msgs[i].MentionedHere = messageMentionsHere(msgs[i].Text) || messageMentionsHere(msgs[i].ForwardedText)
 			msgs[i].Text = a.formatMentionsForDisplay(msgs[i].Text)
 			msgs[i].ForwardedText = a.formatMentionsForDisplay(msgs[i].ForwardedText)
-			if msgs[i].AvatarURL == "" && msgs[i].UserID != "" {
+			if msgs[i].UserID != "" {
 				if info, ok := a.userInfoByID[msgs[i].UserID]; ok {
-					msgs[i].AvatarURL = info.AvatarURL
+					if msgs[i].BotID == "" {
+						// Real user: always prefer profile directory avatar —
+						// the embedded message avatar may be the Slack app icon.
+						if strings.TrimSpace(info.AvatarURL) != "" {
+							msgs[i].AvatarURL = info.AvatarURL
+						}
+					} else if msgs[i].AvatarURL == "" {
+						msgs[i].AvatarURL = info.AvatarURL
+					}
 				}
 			}
 		}
@@ -2658,14 +2668,8 @@ func (a *App) buildSettingsMenu() *fyne.Menu {
 		wsItems := make([]*fyne.MenuItem, len(a.workspaceNames))
 		for i, name := range a.workspaceNames {
 			idx := i
-			n := name
-			wsItems[i] = fyne.NewMenuItem(n, func() {
-				if a.workspaceSwitchFn != nil {
-					a.workspaceSwitchFn(idx)
-				}
-				if a.fyneApp != nil {
-					a.fyneApp.Quit()
-				}
+			wsItems[i] = fyne.NewMenuItem(name, func() {
+				a.switchToWorkspace(idx)
 			})
 		}
 		workspaceItem = fyne.NewMenuItem("Switch Workspace", nil)
@@ -2828,6 +2832,87 @@ func (a *App) setShowImagePreviews(enabled bool) {
 		a.fyneApp.Preferences().SetBool(prefImagePreviews, enabled)
 	}
 	a.refreshPanesForTheme()
+}
+
+// switchToWorkspace resolves credentials for workspace idx in a background
+// goroutine (so the UI stays responsive) then calls reconnect on the main goroutine.
+func (a *App) switchToWorkspace(idx int) {
+	if a.workspaceResolveFn == nil {
+		return
+	}
+	a.setStatus("Switching workspace...")
+	go func() {
+		client, info, appToken, err := a.workspaceResolveFn(idx)
+		fyne.Do(func() {
+			if err != nil {
+				dialog.ShowError(err, a.win)
+				a.setStatusTemporary("Workspace switch failed", 4*time.Second)
+				return
+			}
+			a.reconnect(client, info, appToken)
+		})
+	}()
+}
+
+// reconnect tears down the current workspace session and initialises a new one
+// in-place, without restarting the process.
+func (a *App) reconnect(client *api.Client, info *api.AuthInfo, appToken string) {
+	a.stopRealtimeUpdates()
+
+	a.client = client
+	a.info = info
+	a.appToken = strings.TrimSpace(appToken)
+
+	// Clear all workspace-specific data.
+	a.channels = nil
+	a.channelByID = map[string]api.Channel{}
+	a.recentThreads = nil
+	a.groupNameCache = map[string]string{}
+	a.usersMu.Lock()
+	a.users = map[string]string{}
+	a.usersMu.Unlock()
+	a.userByHandle = map[string]string{}
+	a.userByID = map[string]string{}
+	a.userHandleByID = map[string]string{}
+	a.userInfoByID = map[string]api.UserInfo{}
+
+	// Clear pane content; keep layout structure.
+	for _, p := range a.paneManager.allPanes() {
+		p.channelID = ""
+		p.channelName = ""
+		p.threadTS = ""
+		p.replyTarget = nil
+		p.clearMessages()
+		p.setTitle("Select a channel")
+		p.setThreadBanner("")
+	}
+	a.selectedChannelID = ""
+	a.selectedThreadTS = ""
+	a.rebuildFilteredChannels()
+
+	// Update sidebar workspace name; icon will be refreshed by loadWorkspaceIconAsync.
+	teamName := "Design Spark"
+	if info != nil && strings.TrimSpace(info.TeamName) != "" {
+		teamName = strings.TrimSpace(info.TeamName)
+	}
+	if a.sidebarTitle != nil {
+		a.sidebarTitle.Text = teamName
+		a.sidebarTitle.Refresh()
+	}
+	if a.sidebarWorkspaceIconWrap != nil {
+		a.sidebarWorkspaceIconWrap.Hide()
+		a.sidebarWorkspaceIconWrap.Refresh()
+	}
+
+	// Restore pane layout for this workspace, then load data.
+	a.restorePaneLayoutState()
+	a.loadWorkspaceIconAsync()
+	go a.loadInitialDataAsync(func() {
+		a.refreshPaneTitles()
+		time.AfterFunc(realtimeStartupDelay, func() {
+			a.startRealtimeUpdates()
+		})
+	})
 }
 
 func (a *App) setShowFormatBar(enabled bool) {

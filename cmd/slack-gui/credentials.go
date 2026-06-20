@@ -112,6 +112,23 @@ func workspaceNamesFromConfig() (names []string, configPath string) {
 	return nil, ""
 }
 
+// credentialsForWorkspaceIndex returns the token and app-token for a specific
+// workspace index in the config file without changing active_workspace.
+func credentialsForWorkspaceIndex(path string, idx int) (token, appToken string, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", err
+	}
+	var cfg slackConfigFile
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return "", "", fmt.Errorf("invalid JSON: %w", err)
+	}
+	if idx < 0 || idx >= len(cfg.Workspaces) {
+		return "", "", fmt.Errorf("workspace index %d out of range", idx)
+	}
+	return strings.TrimSpace(cfg.Workspaces[idx].Token), strings.TrimSpace(cfg.Workspaces[idx].AppToken), nil
+}
+
 // setActiveWorkspace writes an updated active_workspace index to the config file.
 func setActiveWorkspace(path string, idx int) error {
 	data, err := os.ReadFile(path)
