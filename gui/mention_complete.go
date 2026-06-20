@@ -19,10 +19,18 @@ type completionMatch struct {
 
 // mentionCompleter shows a small popup list of matching users when the composer
 // detects an @prefix. The popup uses plain tappable rows (not widget.List) to
-// avoid Fyne's internal focus management, which causes a canvas focus error
-// when the popup overlay is dismissed.
+// avoid Fyne's internal focus management.
+//
+// Fyne's PopUp runs in its own overlay focus context, which means keyboard
+// events are routed to the overlay's focus manager rather than the main canvas.
+// To keep the composer entry receiving keystrokes we:
+//  1. Reuse a single PopUp and swap its Content in-place (avoids the
+//     hide→show cycle that triggers extra focus-context switches).
+//  2. Call cvs.Focus(entry) after each show so the entry is registered as the
+//     focused widget inside the overlay's focus context.
 type mentionCompleter struct {
 	popup     *widget.PopUp
+	entry     fyne.Focusable
 	items     []completionMatch
 	selected  int
 	rowBGs    []*canvas.Rectangle
@@ -31,11 +39,11 @@ type mentionCompleter struct {
 	cvs       fyne.Canvas
 }
 
-func newMentionCompleter(cvs fyne.Canvas, onPick func(handle string)) *mentionCompleter {
-	return &mentionCompleter{cvs: cvs, onPick: onPick}
+func newMentionCompleter(cvs fyne.Canvas, entry fyne.Focusable, onPick func(handle string)) *mentionCompleter {
+	return &mentionCompleter{cvs: cvs, entry: entry, onPick: onPick}
 }
 
-// update shows or replaces the popup with fresh match rows positioned above anchor.
+// update shows or refreshes the popup with fresh match rows positioned above anchor.
 // Calling with an empty slice hides the popup.
 func (mc *mentionCompleter) update(matches []completionMatch, anchor fyne.CanvasObject) {
 	if len(matches) == 0 {
@@ -78,10 +86,6 @@ func (mc *mentionCompleter) update(matches []completionMatch, anchor fyne.Canvas
 		rows.Add(row)
 	}
 
-	if mc.popup != nil {
-		mc.popup.Hide()
-	}
-
 	outerBG := canvas.NewRectangle(popupBGColor())
 	outerBG.CornerRadius = 7
 	outerBorder := canvas.NewRectangle(color.Transparent)
@@ -98,14 +102,29 @@ func (mc *mentionCompleter) update(matches []completionMatch, anchor fyne.Canvas
 		container.NewMax(outerBG, outerBorder, padded),
 	)
 
-	mc.popup = widget.NewPopUp(content, mc.cvs)
-
 	abs := fyne.CurrentApp().Driver().AbsolutePositionForObject(anchor)
 	pos := fyne.NewPos(abs.X, abs.Y-h-6)
 	if pos.Y < 10 {
 		pos.Y = abs.Y + anchor.Size().Height + 6
 	}
+
+	if mc.popup == nil {
+		// First show: create the popup.
+		mc.popup = widget.NewPopUp(content, mc.cvs)
+	} else {
+		// Subsequent updates: swap content in-place to avoid the Hide→Show
+		// cycle that would trigger an extra overlay focus-context switch.
+		mc.popup.Content = content
+		mc.popup.Refresh()
+	}
 	mc.popup.ShowAtPosition(pos)
+
+	// Fyne routes keyboard events to the overlay's focus manager when a PopUp
+	// is visible. Re-focus the composer entry inside that context so keystrokes
+	// keep reaching it while the completer is open.
+	if mc.entry != nil {
+		mc.cvs.Focus(mc.entry)
+	}
 }
 
 func (mc *mentionCompleter) hide() {

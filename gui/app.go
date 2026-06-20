@@ -2575,7 +2575,7 @@ func (a *App) mentionMatches(prefix string) []completionMatch {
 // initPaneMention wires up the @mention autocompleter for a newly created pane.
 func (a *App) initPaneMention(p *chatPane) {
 	p.mentionFn = a.mentionMatches
-	p.completer = newMentionCompleter(a.win.Canvas(), func(handle string) {
+	p.completer = newMentionCompleter(a.win.Canvas(), p.input, func(handle string) {
 		applyMentionCompletion(p.input, handle)
 	})
 }
