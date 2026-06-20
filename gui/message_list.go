@@ -20,6 +20,7 @@ func trimEq(a, b string) bool {
 type messageRenderCtx struct {
 	selfUserID     string
 	showTimestamps bool
+	imagePreviews  bool
 	inThreadView   bool
 	compact        bool
 	win            fyne.Window
@@ -42,6 +43,7 @@ type virtualMessageList struct {
 	list    *widget.List
 	msgs    []api.Message
 	ctx     messageRenderCtx
+	loading bool
 	heights map[int]float32
 }
 
@@ -67,7 +69,11 @@ func newVirtualMessageList() *virtualMessageList {
 			var row fyne.CanvasObject
 			switch {
 			case len(v.msgs) == 0:
-				lbl := widget.NewLabel("No messages yet")
+				labelText := "No messages yet"
+				if v.loading {
+					labelText = "Loading messages..."
+				}
+				lbl := widget.NewLabel(labelText)
 				lbl.Importance = widget.LowImportance
 				lbl.Wrapping = fyne.TextWrapWord
 				row = container.NewPadded(lbl)
@@ -96,13 +102,14 @@ func (v *virtualMessageList) renderRow(i int) fyne.CanvasObject {
 	m := v.msgs[i]
 	isFromMe := trimEq(m.UserID, v.ctx.selfUserID)
 	showHeader := isFirstInSenderGroup(v.msgs, i)
-	return renderMessageRow(m, isFromMe, m.MentionedMe, v.ctx.selfUserID, v.ctx.win, v.ctx.showTimestamps, v.ctx.compact, v.ctx.onThread, v.ctx.onReply, v.ctx.onMedia, v.ctx.onReaction, v.ctx.fetchMedia, showHeader, v.ctx.inThreadView)
+	return renderMessageRow(m, isFromMe, m.MentionedMe, v.ctx.selfUserID, v.ctx.win, v.ctx.showTimestamps, v.ctx.imagePreviews, v.ctx.compact, v.ctx.onThread, v.ctx.onReply, v.ctx.onMedia, v.ctx.onReaction, v.ctx.fetchMedia, showHeader, v.ctx.inThreadView)
 }
 
 // setMessages swaps in a new history and refreshes the visible window only.
 func (v *virtualMessageList) setMessages(msgs []api.Message, ctx messageRenderCtx) {
 	v.msgs = msgs
 	v.ctx = ctx
+	v.loading = false
 	v.heights = map[int]float32{}
 	v.list.Refresh()
 	if len(msgs) > 0 {
@@ -112,12 +119,21 @@ func (v *virtualMessageList) setMessages(msgs []api.Message, ctx messageRenderCt
 
 func (v *virtualMessageList) clear() {
 	v.msgs = nil
+	v.loading = false
 	v.heights = map[int]float32{}
 	v.list.Refresh()
 }
 
-func (v *virtualMessageList) refreshOptions(showTimestamps bool, compact bool) {
+func (v *virtualMessageList) setLoading() {
+	v.msgs = nil
+	v.loading = true
+	v.heights = map[int]float32{}
+	v.list.Refresh()
+}
+
+func (v *virtualMessageList) refreshOptions(showTimestamps bool, imagePreviews bool, compact bool) {
 	v.ctx.showTimestamps = showTimestamps
+	v.ctx.imagePreviews = imagePreviews
 	v.ctx.compact = compact
 	v.heights = map[int]float32{}
 	v.list.Refresh()

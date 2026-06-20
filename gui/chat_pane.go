@@ -262,7 +262,11 @@ func (p *chatPane) clearMessages() {
 	p.msgList.clear()
 }
 
-func (p *chatPane) refreshForTheme(showTimestamps bool, compact bool) {
+func (p *chatPane) setLoadingMessages() {
+	p.msgList.setLoading()
+}
+
+func (p *chatPane) refreshForTheme(showTimestamps bool, imagePreviews bool, compact bool) {
 	if p.inputBg != nil {
 		p.inputBg.FillColor = palette.ComposerBG
 		p.inputBg.Refresh()
@@ -299,7 +303,7 @@ func (p *chatPane) refreshForTheme(showTimestamps bool, compact bool) {
 	p.replyLabel.Refresh()
 	p.threadLabel.Refresh()
 	p.title.Refresh()
-	p.msgList.refreshOptions(showTimestamps, compact)
+	p.msgList.refreshOptions(showTimestamps, imagePreviews, compact)
 	p.msgScroll.Refresh()
 	p.panel.Refresh()
 }
@@ -316,10 +320,11 @@ func (p *chatPane) scrollToBottomSoon() {
 	}()
 }
 
-func (p *chatPane) setMessages(msgs []api.Message, selfUserID string, win fyne.Window, showTimestamps bool, compact bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error)) {
+func (p *chatPane) setMessages(msgs []api.Message, selfUserID string, win fyne.Window, showTimestamps bool, imagePreviews bool, compact bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error)) {
 	p.msgList.setMessages(msgs, messageRenderCtx{
 		selfUserID:     selfUserID,
 		showTimestamps: showTimestamps,
+		imagePreviews:  imagePreviews,
 		compact:        compact,
 		inThreadView:   strings.TrimSpace(p.threadTS) != "",
 		win:            win,

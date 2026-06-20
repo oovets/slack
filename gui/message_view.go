@@ -36,7 +36,7 @@ var (
 // fixed timeout so goroutines can't block indefinitely on slow or stalled URLs.
 var mediaHTTPClient = &http.Client{Timeout: 8 * time.Second}
 
-func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID string, win fyne.Window, showTimestamps bool, compact bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error), showHeader bool, inThreadView bool) fyne.CanvasObject {
+func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID string, win fyne.Window, showTimestamps bool, imagePreviews bool, compact bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error), showHeader bool, inThreadView bool) fyne.CanvasObject {
 	name := senderName(m)
 	ts := canvas.NewText(formatHoverTimestamp(m.Time), color.NRGBA{R: 100, G: 106, B: 130, A: 190})
 	ts.TextSize = hoverTimestampTextSize()
@@ -116,7 +116,11 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 		rowWithMeta.Add(alignOutgoingRow(newAttachmentCardView(card), isFromMe))
 	}
 	for _, img := range m.InlineImages {
-		rowWithMeta.Add(alignOutgoingRow(newInlineImagePreview(img.URL, img.Name, fetchMedia), isFromMe))
+		if imagePreviews {
+			rowWithMeta.Add(alignOutgoingRow(newInlineImagePreview(img.URL, img.Name, fetchMedia), isFromMe))
+			continue
+		}
+		rowWithMeta.Add(alignOutgoingRow(newInlineImageLink(img.URL, img.Name), isFromMe))
 	}
 	for _, f := range m.Files {
 		ff := f
@@ -125,7 +129,9 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 			name = "file"
 		}
 		if f.IsImage() && strings.TrimSpace(f.BestImageURL()) != "" {
-			rowWithMeta.Add(alignOutgoingRow(newInlineImagePreview(f.BestImageURL(), name, fetchMedia), isFromMe))
+			if imagePreviews {
+				rowWithMeta.Add(alignOutgoingRow(newInlineImagePreview(f.BestImageURL(), name, fetchMedia), isFromMe))
+			}
 			rowWithMeta.Add(alignOutgoingRow(newSubtleTapLabel("Open image", func() {
 				if onMedia != nil {
 					onMedia(ff)
@@ -657,6 +663,22 @@ func newInlineImagePreview(rawURL, name string, fetchMedia func(string) ([]byte,
 		})
 	}()
 	return container.NewGridWrap(fyne.NewSize(previewW, previewH), host)
+}
+
+func newInlineImageLink(rawURL, name string) fyne.CanvasObject {
+	label := strings.TrimSpace(name)
+	if label == "" {
+		label = "Open image"
+	}
+	if u := parseDisplayURL(rawURL); u != nil {
+		link := widget.NewHyperlink(label, u)
+		link.Wrapping = fyne.TextWrapWord
+		return link
+	}
+	out := widget.NewLabel(label)
+	out.Importance = widget.LowImportance
+	out.Wrapping = fyne.TextWrapWord
+	return out
 }
 
 func fetchPreviewImage(rawURL string, fetchMedia func(string) ([]byte, string, error)) ([]byte, error) {

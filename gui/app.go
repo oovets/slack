@@ -48,6 +48,7 @@ var (
 const (
 	prefShowChatList    = "ui.show_chat_list"
 	prefShowTimestamps  = "ui.show_timestamps"
+	prefImagePreviews   = "ui.image_previews"
 	prefCompactMode     = "ui.compact_mode"
 	prefDarkMode        = "ui.dark_mode"
 	prefFontSize        = "ui.font_size"
@@ -74,10 +75,11 @@ const (
 // Timing constants for scroll-to-bottom retries after layout changes.
 // Multiple attempts are needed because Fyne lays out widgets asynchronously.
 const (
-	reloadDebounce        = 250 * time.Millisecond
-	realtimeStartupDelay  = 700 * time.Millisecond
-	postSendRefreshDelay  = 130 * time.Millisecond
-	sidebarSearchDebounce = 90 * time.Millisecond
+	reloadDebounce         = 250 * time.Millisecond
+	realtimeStartupDelay   = 700 * time.Millisecond
+	postSendRefreshDelay   = 130 * time.Millisecond
+	sidebarSearchDebounce  = 90 * time.Millisecond
+	sidebarRebuildDebounce = 80 * time.Millisecond
 )
 
 // Image preview window dimensions.
@@ -137,6 +139,7 @@ type App struct {
 	statusActionFn    func()
 	showChatList      bool
 	showTimestamps    bool
+	showImagePreviews bool
 
 	paneManager *paneManager
 
@@ -150,7 +153,7 @@ type App struct {
 	suppressSidebarSelect    bool
 	sidebarHoverListID       int
 	statusClearTimer         *time.Timer
-	sidebarSearchTimer       *time.Timer
+	sidebarRebuildTimer      *time.Timer
 
 	initialChannelID string
 	initialThreadTS  string
@@ -222,7 +225,6 @@ func (a *App) Run() {
 	a.paneManager = newPaneManager(
 		func(p *chatPane) {
 			a.syncSidebarSelectionToFocusedPane(p)
-			a.focusPaneInput(p)
 		},
 		func() *chatPane {
 			p := newChatPane(
@@ -262,14 +264,13 @@ func (a *App) Run() {
 	a.fyneApp.Lifecycle().SetOnEnteredForeground(func() {
 		fyne.Do(func() {
 			a.paneManager.setAppFocused(true)
-			a.focusPaneInput(a.paneManager.focusedPane())
 		})
 	})
 	a.win.SetOnClosed(func() {
 		a.stopRealtimeUpdates()
-		if a.sidebarSearchTimer != nil {
-			a.sidebarSearchTimer.Stop()
-			a.sidebarSearchTimer = nil
+		if a.sidebarRebuildTimer != nil {
+			a.sidebarRebuildTimer.Stop()
+			a.sidebarRebuildTimer = nil
 		}
 		a.saveWindowSizePreference()
 		a.savePaneLayoutState()
@@ -281,7 +282,6 @@ func (a *App) Run() {
 	a.setStatusTemporary("Ready", 2*time.Second)
 	a.applyInitialOpen()
 	a.refreshPaneTitles()
-	a.focusPaneInput(a.paneManager.focusedPane())
 	// Delay realtime startup slightly to avoid competing with initial full loads.
 	time.AfterFunc(realtimeStartupDelay, func() {
 		a.startRealtimeUpdates()
@@ -838,14 +838,27 @@ func (a *App) rebuildFilteredChannels() {
 }
 
 func (a *App) scheduleSidebarFilterRebuild() {
-	if a.sidebarSearchTimer != nil {
-		a.sidebarSearchTimer.Stop()
+	a.scheduleSidebarRebuild(sidebarSearchDebounce)
+}
+
+func (a *App) scheduleSidebarRebuild(delay time.Duration) {
+	if delay < 0 {
+		delay = 0
 	}
-	a.sidebarSearchTimer = time.AfterFunc(sidebarSearchDebounce, func() {
+	if a.sidebarRebuildTimer != nil {
+		a.sidebarRebuildTimer.Stop()
+	}
+	var timer *time.Timer
+	timer = time.AfterFunc(delay, func() {
 		fyne.Do(func() {
+			if a.sidebarRebuildTimer != timer {
+				return
+			}
+			a.sidebarRebuildTimer = nil
 			a.rebuildFilteredChannels()
 		})
 	})
+	a.sidebarRebuildTimer = timer
 }
 
 func (a *App) updateChatListWidth() {
@@ -1077,9 +1090,8 @@ func (a *App) assignChannelToFocusedPane(channelID string) {
 	p.setTitle(fmt.Sprintf("%s%s", a.chatPrefix(ch), p.channelName))
 	p.input.SetPlaceHolder(a.chatInputPlaceholder(ch))
 	a.setSelectedSidebarChannel(channelID)
-	p.clearMessages()
+	p.setLoadingMessages()
 	a.clearChannelUnreadState(channelID)
-	a.focusPaneInput(p)
 	a.schedulePaneScrollToBottom(p)
 	a.savePaneLayoutState()
 	a.setStatusTemporary("Switched to "+a.chatPrefix(ch)+p.channelName, 3*time.Second)
@@ -1102,7 +1114,7 @@ func (a *App) clearChannelUnreadState(channelID string) {
 		break
 	}
 	if changed {
-		a.rebuildFilteredChannels()
+		a.scheduleSidebarRebuild(sidebarRebuildDebounce)
 	}
 }
 
@@ -1128,7 +1140,7 @@ func (a *App) markChannelUnreadState(channelID, latestTS string) {
 		break
 	}
 	if changed {
-		a.rebuildFilteredChannels()
+		a.scheduleSidebarRebuild(sidebarRebuildDebounce)
 	}
 }
 
@@ -1207,7 +1219,7 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 				}
 			}
 		}
-		p.setMessages(msgs, a.info.UserID, a.win, a.showTimestamps, a.appTheme.compactMode, func(m api.Message) {
+		p.setMessages(msgs, a.info.UserID, a.win, a.showTimestamps, a.showImagePreviews, a.appTheme.compactMode, func(m api.Message) {
 			a.openThreadInPane(p, m)
 		}, func(m api.Message) {
 			a.setReplyTarget(p, m)
@@ -1356,6 +1368,7 @@ func (a *App) openThreadInPane(p *chatPane, m api.Message) {
 	p.replyHolder.Hide()
 	p.setThreadBanner(fmt.Sprintf("Thread: %s — %s", senderName(m), truncate(strings.TrimSpace(m.Text), 80)))
 	p.setTitle(fmt.Sprintf("#%s — thread", p.channelName))
+	p.setLoadingMessages()
 	a.schedulePaneScrollToBottom(p)
 	a.savePaneLayoutState()
 	go a.loadMessagesForPane(p)
@@ -1371,6 +1384,7 @@ func (a *App) exitThreadInPane(p *chatPane) {
 	p.replyTarget = nil
 	p.replyHolder.Hide()
 	p.setTitle(fmt.Sprintf("#%s", p.channelName))
+	p.setLoadingMessages()
 	a.schedulePaneScrollToBottom(p)
 	a.savePaneLayoutState()
 	go a.loadMessagesForPane(p)
@@ -1456,27 +1470,74 @@ func (a *App) sendFromPane(p *chatPane) {
 
 func (a *App) setSelectedSidebarChannel(channelID string) {
 	channelID = strings.TrimSpace(channelID)
+	prevChannelID := a.selectedChannelID
+	prevThreadTS := a.selectedThreadTS
 	if a.selectedChannelID == channelID && a.selectedThreadTS == "" {
 		return
 	}
 	a.selectedChannelID = channelID
 	a.selectedThreadTS = ""
-	if a.channelList != nil {
-		a.channelList.Refresh()
-	}
+	a.refreshSidebarSelectionRows(prevChannelID, prevThreadTS, channelID, "")
 }
 
 func (a *App) setSelectedSidebarThread(channelID, threadTS string) {
 	channelID = strings.TrimSpace(channelID)
 	threadTS = strings.TrimSpace(threadTS)
+	prevChannelID := a.selectedChannelID
+	prevThreadTS := a.selectedThreadTS
 	if a.selectedChannelID == channelID && a.selectedThreadTS == threadTS {
 		return
 	}
 	a.selectedChannelID = channelID
 	a.selectedThreadTS = threadTS
-	if a.channelList != nil {
-		a.channelList.Refresh()
+	a.refreshSidebarSelectionRows(prevChannelID, prevThreadTS, channelID, threadTS)
+}
+
+func (a *App) refreshSidebarSelectionRows(prevChannelID, prevThreadTS, nextChannelID, nextThreadTS string) {
+	if a.channelList == nil {
+		return
 	}
+	ids := map[widget.ListItemID]bool{}
+	for _, id := range a.sidebarSelectionRowIndexes(prevChannelID, prevThreadTS) {
+		ids[id] = true
+	}
+	for _, id := range a.sidebarSelectionRowIndexes(nextChannelID, nextThreadTS) {
+		ids[id] = true
+	}
+	if len(ids) == 0 {
+		a.channelList.Refresh()
+		return
+	}
+	for id := range ids {
+		a.channelList.RefreshItem(id)
+	}
+}
+
+func (a *App) sidebarSelectionRowIndexes(channelID, threadTS string) []widget.ListItemID {
+	channelID = strings.TrimSpace(channelID)
+	threadTS = strings.TrimSpace(threadTS)
+	if channelID == "" {
+		return nil
+	}
+	out := make([]widget.ListItemID, 0, 2)
+	for i, item := range a.listItems {
+		if threadTS != "" {
+			if item.thread == nil {
+				continue
+			}
+			if strings.TrimSpace(item.thread.ChannelID) == channelID && strings.TrimSpace(item.thread.ThreadTS) == threadTS {
+				out = append(out, widget.ListItemID(i))
+			}
+			continue
+		}
+		if item.channel == nil {
+			continue
+		}
+		if strings.TrimSpace(item.channel.ID) == channelID {
+			out = append(out, widget.ListItemID(i))
+		}
+	}
+	return out
 }
 
 func (a *App) syncSidebarSelection() {
@@ -1815,7 +1876,7 @@ func (a *App) isBotOrAppDM(userID string) bool {
 			}
 			fyne.Do(func() {
 				a.userInfoByID[id] = *fetched
-				a.rebuildFilteredChannels()
+				a.scheduleSidebarRebuild(sidebarRebuildDebounce)
 			})
 		}()
 		return false
@@ -1887,6 +1948,7 @@ func (a *App) openThreadFromList(t threadListEntry) {
 	p.setThreadBanner("Thread: " + strings.TrimSpace(t.Title))
 	p.input.SetPlaceHolder(a.chatInputPlaceholder(ch))
 	p.setTitle(fmt.Sprintf("%s%s — thread", a.chatPrefix(ch), p.channelName))
+	p.setLoadingMessages()
 	a.schedulePaneScrollToBottom(p)
 	a.savePaneLayoutState()
 	go a.loadMessagesForPane(p)
@@ -2341,18 +2403,15 @@ func (a *App) registerShortcuts() {
 	c.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyName("H"), Modifier: fyne.KeyModifierControl}, func(_ fyne.Shortcut) {
 		p := a.newPane()
 		a.paneManager.splitFocused(splitHorizontal, p)
-		a.focusPaneInput(a.paneManager.focusedPane())
 		a.savePaneLayoutState()
 	})
 	c.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyName("J"), Modifier: fyne.KeyModifierControl}, func(_ fyne.Shortcut) {
 		p := a.newPane()
 		a.paneManager.splitFocused(splitVertical, p)
-		a.focusPaneInput(a.paneManager.focusedPane())
 		a.savePaneLayoutState()
 	})
 	c.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyName("W"), Modifier: fyne.KeyModifierControl}, func(_ fyne.Shortcut) {
 		a.paneManager.closeFocused()
-		a.focusPaneInput(a.paneManager.focusedPane())
 		a.savePaneLayoutState()
 	})
 	c.AddShortcut(&desktop.CustomShortcut{KeyName: fyne.KeyName("S"), Modifier: fyne.KeyModifierControl}, func(_ fyne.Shortcut) {
@@ -2382,6 +2441,10 @@ func (a *App) buildSettingsMenu() *fyne.Menu {
 	if a.showTimestamps {
 		timestampsLabel = "Hide Timestamps"
 	}
+	imagePreviewsLabel := "Show Image Previews"
+	if a.showImagePreviews {
+		imagePreviewsLabel = "Hide Image Previews"
+	}
 	separatorLabel := "Hide Pane Separators"
 	if !a.showPaneSeparators {
 		separatorLabel = "Show Pane Separators"
@@ -2407,18 +2470,15 @@ func (a *App) buildSettingsMenu() *fyne.Menu {
 		fyne.NewMenuItem("Split Right  ⌃H", func() {
 			p := a.newPane()
 			a.paneManager.splitFocused(splitHorizontal, p)
-			a.focusPaneInput(a.paneManager.focusedPane())
 			a.savePaneLayoutState()
 		}),
 		fyne.NewMenuItem("Split Down  ⌃J", func() {
 			p := a.newPane()
 			a.paneManager.splitFocused(splitVertical, p)
-			a.focusPaneInput(a.paneManager.focusedPane())
 			a.savePaneLayoutState()
 		}),
 		fyne.NewMenuItem("Close Pane  ⌃W", func() {
 			a.paneManager.closeFocused()
-			a.focusPaneInput(a.paneManager.focusedPane())
 			a.savePaneLayoutState()
 		}),
 		fyne.NewMenuItemSeparator(),
@@ -2451,6 +2511,7 @@ func (a *App) buildSettingsMenu() *fyne.Menu {
 		}),
 		fontItem,
 		fyne.NewMenuItem(timestampsLabel, func() { a.setShowTimestamps(!a.showTimestamps) }),
+		fyne.NewMenuItem(imagePreviewsLabel, func() { a.setShowImagePreviews(!a.showImagePreviews) }),
 		fyne.NewMenuItem(separatorLabel, func() { a.togglePaneSeparators() }),
 		fyne.NewMenuItem("Toggle Channel List", func() { a.toggleChatList() }),
 		fyne.NewMenuItem(compactLabel, func() { a.setCompactMode(!a.appTheme.compactMode) }),
@@ -2549,6 +2610,14 @@ func (a *App) setShowTimestamps(enabled bool) {
 	a.refreshPanesForTheme()
 }
 
+func (a *App) setShowImagePreviews(enabled bool) {
+	a.showImagePreviews = enabled
+	if a.fyneApp != nil {
+		a.fyneApp.Preferences().SetBool(prefImagePreviews, enabled)
+	}
+	a.refreshPanesForTheme()
+}
+
 func (a *App) setFontSize(size int) {
 	if a.fyneApp == nil || a.appTheme == nil {
 		return
@@ -2575,7 +2644,7 @@ func (a *App) setFont(family string) {
 
 func (a *App) refreshPanesForTheme() {
 	for _, p := range a.paneManager.allPanes() {
-		p.refreshForTheme(a.showTimestamps, a.appTheme.compactMode)
+		p.refreshForTheme(a.showTimestamps, a.showImagePreviews, a.appTheme.compactMode)
 	}
 }
 
@@ -2594,7 +2663,6 @@ func (a *App) moveFocusedPaneToNewWindow() {
 	}
 	if len(a.paneManager.allPanes()) > 1 {
 		a.paneManager.closeFocused()
-		a.focusPaneInput(a.paneManager.focusedPane())
 		a.savePaneLayoutState()
 		return
 	}
@@ -2648,6 +2716,7 @@ func (a *App) applyInitialOpen() {
 	}
 	p.input.SetPlaceHolder(a.chatInputPlaceholder(ch))
 	p.setTitle(fmt.Sprintf("%s%s", a.chatPrefix(ch), p.channelName))
+	p.setLoadingMessages()
 	a.schedulePaneScrollToBottom(p)
 	a.savePaneLayoutState()
 	go a.loadMessagesForPane(p)
@@ -2666,13 +2735,6 @@ func (a *App) newPane() *chatPane {
 	return p
 }
 
-func (a *App) focusPaneInput(p *chatPane) {
-	if p == nil || a.win == nil {
-		return
-	}
-	a.win.Canvas().Focus(p.input)
-}
-
 func (a *App) loadUIState() {
 	if a.fyneApp == nil || a.appTheme == nil {
 		return
@@ -2680,6 +2742,7 @@ func (a *App) loadUIState() {
 	prefs := a.fyneApp.Preferences()
 	a.showChatList = prefs.BoolWithFallback(prefShowChatList, true)
 	a.showTimestamps = prefs.BoolWithFallback(prefShowTimestamps, false)
+	a.showImagePreviews = prefs.BoolWithFallback(prefImagePreviews, true)
 	a.appTheme.dark = prefs.BoolWithFallback(prefDarkMode, a.appTheme.dark)
 	a.appTheme.compactMode = prefs.BoolWithFallback(prefCompactMode, true)
 	fontSize := prefs.IntWithFallback(prefFontSize, int(a.appTheme.fontSize))
@@ -2758,18 +2821,15 @@ func (a *App) handleInputShortcut(shortcut fyne.Shortcut) bool {
 	case fyne.KeyName("H"):
 		p := a.newPane()
 		a.paneManager.splitFocused(splitHorizontal, p)
-		a.focusPaneInput(a.paneManager.focusedPane())
 		a.savePaneLayoutState()
 		return true
 	case fyne.KeyName("J"):
 		p := a.newPane()
 		a.paneManager.splitFocused(splitVertical, p)
-		a.focusPaneInput(a.paneManager.focusedPane())
 		a.savePaneLayoutState()
 		return true
 	case fyne.KeyName("W"):
 		a.paneManager.closeFocused()
-		a.focusPaneInput(a.paneManager.focusedPane())
 		a.savePaneLayoutState()
 		return true
 	case fyne.KeyName("S"):

@@ -147,9 +147,6 @@ func (s *paneSurface) TappedSecondary(_ *fyne.PointEvent) {
 	}
 }
 func (s *paneSurface) MouseIn(_ *desktop.MouseEvent) {
-	if s.onActivate != nil {
-		s.onActivate()
-	}
 }
 func (s *paneSurface) MouseOut()                        {}
 func (s *paneSurface) MouseMoved(_ *desktop.MouseEvent) {}
