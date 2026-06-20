@@ -31,11 +31,6 @@ type uiPalette struct {
 	MentionRowBG color.NRGBA
 	MentionAmber color.NRGBA
 
-	// === Design Spark redesign tokens ===
-	// Workspace rail (far-left strip)
-	RailBG      color.NRGBA
-	RailIcon    color.NRGBA
-	RailIconHot color.NRGBA
 	// Sidebar (channels/DMs column)
 	SidebarBG      color.NRGBA
 	SidebarHover   color.NRGBA
@@ -91,10 +86,6 @@ var darkUIColors = uiPalette{
 	MentionRowBG: color.NRGBA{R: 66, G: 53, B: 24, A: 110},
 	MentionAmber: color.NRGBA{R: 242, G: 199, B: 68, A: 255},
 
-	RailBG:      color.NRGBA{R: 10, G: 12, B: 18, A: 255},
-	RailIcon:    color.NRGBA{R: 140, G: 148, B: 168, A: 255},
-	RailIconHot: color.NRGBA{R: 230, G: 233, B: 240, A: 255},
-
 	SidebarBG:      color.NRGBA{R: 15, G: 17, B: 24, A: 255},
 	SidebarHover:   color.NRGBA{R: 255, G: 255, B: 255, A: 12},
 	SidebarSelBG:   color.NRGBA{R: 91, G: 141, B: 255, A: 36},
@@ -148,10 +139,6 @@ var lightUIColors = uiPalette{
 	QuoteBar:     color.NRGBA{R: 80, G: 130, B: 220, A: 170},
 	MentionRowBG: color.NRGBA{R: 255, G: 220, B: 60, A: 40},
 	MentionAmber: color.NRGBA{R: 150, G: 100, B: 0, A: 255},
-
-	RailBG:      color.NRGBA{R: 216, G: 218, B: 226, A: 255},
-	RailIcon:    color.NRGBA{R: 75, G: 80, B: 98, A: 255},
-	RailIconHot: color.NRGBA{R: 15, G: 18, B: 32, A: 255},
 
 	SidebarBG:      color.NRGBA{R: 0, G: 0, B: 0, A: 0},
 	SidebarHover:   color.NRGBA{R: 0, G: 0, B: 0, A: 8},

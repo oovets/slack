@@ -132,7 +132,6 @@ type App struct {
 	// Chrome canvas refs updated on light/dark switch.
 	sidebarBg         *canvas.Rectangle
 	sidebarTitle      *canvas.Text
-	railBg            *canvas.Rectangle
 	settingsIcon      fyne.CanvasObject
 	statusActionLabel string
 	statusActionFn    func()
@@ -250,10 +249,8 @@ func (a *App) Run() {
 	statusBarInner := container.NewBorder(nil, nil, a.statusLabel, a.statusActionButton, nil)
 	statusBar := container.NewPadded(statusBarInner)
 
-	rail := a.buildWorkspaceRail()
 	body := container.NewBorder(nil, statusBar, a.chatListPane, nil, a.paneManager.widget())
-	mainArea := container.NewBorder(nil, nil, rail, nil, body)
-	a.rootContent = container.NewStack(mainArea)
+	a.rootContent = container.NewStack(body)
 	a.win.SetContent(a.rootContent)
 
 	a.registerShortcuts()
@@ -2538,10 +2535,6 @@ func (a *App) refreshChromeForTheme() {
 	if a.sidebarTitle != nil {
 		a.sidebarTitle.Color = palette.MetaTextStrong
 		a.sidebarTitle.Refresh()
-	}
-	if a.railBg != nil {
-		a.railBg.FillColor = palette.RailBG
-		a.railBg.Refresh()
 	}
 	if a.channelList != nil {
 		a.channelList.Refresh()
