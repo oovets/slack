@@ -234,5 +234,22 @@ func (p *chatPane) setMessages(msgs []api.Message, currentUserID, selfUserID str
 	})
 	if len(msgs) > 0 {
 		p.scrollToBottomSoon()
+}
+
+// applyLocalReactions updates the rendered chips for one message in this
+// pane without triggering a full history reload. Returns false if the
+// message isn't currently shown (e.g. user already switched channels).
+func (p *chatPane) applyLocalReactions(ts string, reactions []api.Reaction) bool {
+	if p == nil || p.msgList == nil {
+		return false
 	}
+	return p.msgList.applyLocalReactions(ts, reactions)
+}
+
+func (p *chatPane) messageByTS(ts string) (api.Message, bool) {
+	if p == nil || p.msgList == nil {
+		return api.Message{}, false
+	}
+	return p.msgList.messageByTS(ts)
+}
 }
