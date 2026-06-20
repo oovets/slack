@@ -122,3 +122,39 @@ func (v *virtualMessageList) clear() {
 }
 
 func (v *virtualMessageList) scrollToBottom() { v.list.ScrollToBottom() }
+
+// applyLocalReactions swaps in a new reactions slice for the message with
+// the given TS and asks the underlying list to redraw only that one row,
+// so we don't pay for a full history reload on every toggle.
+func (v *virtualMessageList) applyLocalReactions(ts string, reactions []api.Reaction) bool {
+	ts = strings.TrimSpace(ts)
+	if ts == "" {
+		return false
+	}
+	for i := range v.msgs {
+		if strings.TrimSpace(v.msgs[i].TS) != ts {
+			continue
+		}
+		v.msgs[i].Reactions = reactions
+		// Height may change (e.g. reactions row appears/disappears).
+		// Drop the cached height so the next render measures fresh.
+		delete(v.heights, i)
+		v.list.RefreshItem(i)
+		return true
+	}
+	return false
+}
+
+// messageByTS returns a copy of the message with the given TS, if any.
+func (v *virtualMessageList) messageByTS(ts string) (api.Message, bool) {
+	ts = strings.TrimSpace(ts)
+	if ts == "" {
+		return api.Message{}, false
+	}
+	for i := range v.msgs {
+		if strings.TrimSpace(v.msgs[i].TS) == ts {
+			return v.msgs[i], true
+		}
+	}
+	return api.Message{}, false
+}

@@ -458,6 +458,15 @@ func (c *Client) AddReaction(channelID, timestamp, name string) error {
 	return c.postForm("reactions.add", form, &out)
 }
 
+func (c *Client) RemoveReaction(channelID, timestamp, name string) error {
+	form := url.Values{}
+	form.Set("channel", channelID)
+	form.Set("timestamp", timestamp)
+	form.Set("name", strings.Trim(strings.TrimSpace(name), ":"))
+	var out slackEnvelope
+	return c.postForm("reactions.remove", form, &out)
+}
+
 func (c *Client) OpenSocketModeURL(appToken string) (string, error) {
 	tok := strings.TrimSpace(appToken)
 	if tok == "" {
