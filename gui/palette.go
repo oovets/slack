@@ -26,11 +26,11 @@ type uiPalette struct {
 	ThreadAccent   color.NRGBA
 	ThreadHoverBG  color.NRGBA
 	// Quote / mention highlights
-	QuoteBG        color.NRGBA
-	QuoteBar       color.NRGBA
-	MentionRowBG   color.NRGBA
-	MentionAmber   color.NRGBA
-	HereMentionBG  color.NRGBA
+	QuoteBG       color.NRGBA
+	QuoteBar      color.NRGBA
+	MentionRowBG  color.NRGBA
+	MentionAmber  color.NRGBA
+	HereMentionBG color.NRGBA
 
 	// Sidebar (channels/DMs column)
 	SidebarBG      color.NRGBA
