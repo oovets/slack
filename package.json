@@ -1,0 +1,10 @@
+{
+  "name": "slack-gui",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "tail -f /dev/null",
+    "build": "true",
+    "build:dev": "true"
+  }
+}

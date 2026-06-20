@@ -44,6 +44,10 @@ type chatPane struct {
 	inputBorder *canvas.Rectangle
 	threadBg    *canvas.Rectangle
 	replyBg     *canvas.Rectangle
+
+	header      *fyne.Container
+	headerTitle *canvas.Text
+	headerSub   *canvas.Text
 }
 
 func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThread func(*chatPane), onCancelReply func(*chatPane), onResized func(*chatPane), onShortcut func(fyne.Shortcut) bool) *chatPane {
@@ -123,11 +127,39 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 		p.input,
 	)
 	entryRow := container.NewStack(p.inputBg, p.inputBorder, inner)
-	p.inputCard = container.NewVBox(p.inputTopGap, p.threadHolder, p.replyHolder, container.NewPadded(entryRow))
+	formatBar := newFormatBar(p.input)
+	composer := container.NewVBox(formatBar, entryRow)
+	p.inputCard = container.NewVBox(p.inputTopGap, p.threadHolder, p.replyHolder, container.NewPadded(composer))
+
+	// Channel header bar (purple "#"-tile + name + topic) painted at top.
+	p.headerTitle = canvas.NewText("Select a channel", color.NRGBA{R: 240, G: 242, B: 247, A: 255})
+	p.headerTitle.TextStyle = fyne.TextStyle{Bold: true}
+	p.headerTitle.TextSize = 14
+	p.headerSub = canvas.NewText("", palette.SectionLabel)
+	p.headerSub.TextSize = 11
+	tileBg := canvas.NewRectangle(palette.ChannelTileBG)
+	tileBg.CornerRadius = 8
+	tileBg.SetMinSize(fyne.NewSize(30, 30))
+	hash := canvas.NewText("#", palette.ChannelTileFG)
+	hash.TextStyle = fyne.TextStyle{Bold: true}
+	hash.TextSize = 15
+	hash.Alignment = fyne.TextAlignCenter
+	tile := container.NewStack(tileBg, container.NewCenter(hash))
+	headerRow := container.NewHBox(
+		fixedWidthSpacer(12), tile, fixedWidthSpacer(10),
+		container.NewVBox(p.headerTitle, p.headerSub),
+	)
+	headerBg := canvas.NewRectangle(palette.TopBarBG)
+	headerDiv := canvas.NewRectangle(color.NRGBA{R: 255, G: 255, B: 255, A: 14})
+	headerDiv.SetMinSize(fyne.NewSize(1, 1))
+	p.header = container.NewStack(
+		headerBg,
+		container.NewBorder(layoutSpacerH(6), headerDiv, nil, nil, headerRow),
+	)
 
 	p.inputVisible = true
-	p.viewport = container.NewBorder(nil, p.inputCard, nil, nil, p.msgScroll)
-	p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.inputCard}
+	p.viewport = container.NewBorder(p.header, p.inputCard, nil, nil, p.msgScroll)
+	p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.header, p.inputCard}
 	p.panel = container.NewMax(p.viewport)
 	p.root = newPaneSurface(p.panel, func() {
 		if onActivate != nil {
@@ -147,7 +179,25 @@ func (p *chatPane) setFocused(focused bool) {
 	_ = focused
 }
 
-func (p *chatPane) setTitle(t string) { p.title.SetText(t) }
+func (p *chatPane) setTitle(t string) {
+	p.title.SetText(t)
+	if p.headerTitle != nil {
+		name := strings.TrimSpace(p.channelName)
+		if name == "" {
+			name = t
+		}
+		p.headerTitle.Text = name
+		p.headerTitle.Refresh()
+	}
+	if p.headerSub != nil {
+		sub := ""
+		if idx := strings.Index(t, " — "); idx >= 0 {
+			sub = strings.TrimSpace(t[idx+len(" — "):])
+		}
+		p.headerSub.Text = sub
+		p.headerSub.Refresh()
+	}
+}
 
 func (p *chatPane) setThreadBanner(text string) {
 	if p.threadHolder == nil || p.threadLabel == nil {
@@ -173,11 +223,11 @@ func (p *chatPane) setInputVisible(visible bool, reveal bool) {
 	}
 	p.inputVisible = visible
 	if visible {
-		p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.inputCard}
+		p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.header, p.inputCard}
 	} else {
 		hiddenSpacer := canvas.NewRectangle(color.Transparent)
 		hiddenSpacer.SetMinSize(fyne.NewSize(1, 10))
-		p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, hiddenSpacer}
+		p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.header, hiddenSpacer}
 	}
 	p.panel.Refresh()
 	fyne.Do(func() {

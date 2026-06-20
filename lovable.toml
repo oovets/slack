@@ -1,0 +1,4 @@
+[run]
+dev = ".lovable/dev.sh"
+build = "true"
+"build:dev" = "true"
