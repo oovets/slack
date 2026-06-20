@@ -3,6 +3,7 @@ package gui
 import (
 	"image/color"
 	"strings"
+	"unicode"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -189,8 +190,7 @@ func mentionPrefixAt(text string, row, col int) (prefix string, found bool) {
 }
 
 func isMentionHandleChar(r rune) bool {
-	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
-		(r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-'
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '_' || r == '-' || r == ' '
 }
 
 // applyMentionCompletion replaces the @prefix before the cursor with @handle+space.

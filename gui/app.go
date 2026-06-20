@@ -1381,6 +1381,17 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 			p.setThreadBanner("Thread")
 		}
 		for i := range msgs {
+			// Cache display names from embedded user_profile for external/Slack-Connect
+			// users who don't appear in users.list. This ensures their IDs resolve
+			// in future mention lookups within this session.
+			if msgs[i].UserID != "" && msgs[i].Username != "" && msgs[i].BotID == "" {
+				if _, known := a.userByID[msgs[i].UserID]; !known {
+					a.userByID[msgs[i].UserID] = msgs[i].Username
+					a.usersMu.Lock()
+					a.users[msgs[i].UserID] = msgs[i].Username
+					a.usersMu.Unlock()
+				}
+			}
 			msgs[i].MentionedMe = messageMentionsUser(msgs[i].Text, a.info.UserID) || messageMentionsUser(msgs[i].ForwardedText, a.info.UserID)
 			msgs[i].MentionedHere = messageMentionsHere(msgs[i].Text) || messageMentionsHere(msgs[i].ForwardedText)
 			msgs[i].Text = a.formatMentionsForDisplay(msgs[i].Text)
@@ -2527,13 +2538,25 @@ func (a *App) mentionMatches(prefix string) []completionMatch {
 		}
 		out = append(out, completionMatch{label: label, handle: handle})
 	}
-	// Also match by display name prefix.
+	// Also match by display name — either full-name prefix or any word prefix.
 	for id, name := range a.userByID {
 		if seen[id] {
 			continue
 		}
-		if q != "" && !strings.HasPrefix(strings.ToLower(name), q) {
-			continue
+		if q != "" {
+			lower := strings.ToLower(name)
+			matched := strings.HasPrefix(lower, q)
+			if !matched {
+				for _, word := range strings.Fields(lower) {
+					if strings.HasPrefix(word, q) {
+						matched = true
+						break
+					}
+				}
+			}
+			if !matched {
+				continue
+			}
 		}
 		handle := a.userHandleByID[id]
 		if handle == "" {
