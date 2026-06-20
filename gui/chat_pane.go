@@ -46,6 +46,8 @@ type chatPane struct {
 	replyBg     *canvas.Rectangle
 
 	header      *fyne.Container
+	headerBg    *canvas.Rectangle
+	headerLine  *canvas.Rectangle
 	headerTitle *canvas.Text
 	headerSub   *canvas.Text
 }
@@ -85,17 +87,19 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 	p.threadLabel.Wrapping = fyne.TextTruncate
 	p.threadBg = canvas.NewRectangle(theme.Color(theme.ColorNameHover))
 	p.replyBg = canvas.NewRectangle(theme.Color(theme.ColorNameHover))
-	p.threadHolder = container.NewMax(p.threadBg, container.NewPadded(container.NewBorder(nil, nil, nil, widget.NewButton("Leave thread", func() {
+	exitThreadBtn := newGlyph("✕", func() {
 		if onExitThread != nil {
 			onExitThread(p)
 		}
-	}), p.threadLabel)))
+	})
+	p.threadHolder = container.NewMax(p.threadBg, container.NewPadded(container.NewBorder(nil, nil, nil, exitThreadBtn, p.threadLabel)))
 	p.threadHolder.Hide()
-	p.replyHolder = container.NewMax(p.replyBg, container.NewPadded(container.NewBorder(nil, nil, nil, widget.NewButton("Cancel", func() {
+	cancelReplyBtn := newGlyph("✕", func() {
 		if onCancelReply != nil {
 			onCancelReply(p)
 		}
-	}), p.replyLabel)))
+	})
+	p.replyHolder = container.NewMax(p.replyBg, container.NewPadded(container.NewBorder(nil, nil, nil, cancelReplyBtn, p.replyLabel)))
 	p.replyHolder.Hide()
 
 	p.inputTopGap = canvas.NewRectangle(color.Transparent)
@@ -113,17 +117,10 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 	inputBottomPad := canvas.NewRectangle(color.Transparent)
 	inputBottomPad.SetMinSize(fyne.NewSize(1, inputVPad))
 
-	sendBtn := newPrimarySendButton(func() {
-		if onSend != nil {
-			onSend(p)
-		}
-	})
-	rightCol := container.NewVBox(layoutSpacerH(2), sendBtn)
-
 	inner := container.NewBorder(
 		inputTopPad, inputBottomPad,
 		fixedWidthSpacer(inputHPad),
-		container.NewHBox(fixedWidthSpacer(6), rightCol, fixedWidthSpacer(inputHPad)),
+		fixedWidthSpacer(inputHPad),
 		p.input,
 	)
 	entryRow := container.NewStack(p.inputBg, p.inputBorder, inner)
@@ -132,29 +129,30 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 	p.inputCard = container.NewVBox(p.inputTopGap, p.threadHolder, p.replyHolder, container.NewPadded(composer))
 
 	// Channel header bar (purple "#"-tile + name + topic) painted at top.
-	p.headerTitle = canvas.NewText("Select a channel", color.NRGBA{R: 240, G: 242, B: 247, A: 255})
+	p.headerTitle = canvas.NewText("Select a channel", palette.MetaTextStrong)
 	p.headerTitle.TextStyle = fyne.TextStyle{Bold: true}
-	p.headerTitle.TextSize = 14
+	p.headerTitle.TextSize = 12
 	p.headerSub = canvas.NewText("", palette.SectionLabel)
-	p.headerSub.TextSize = 11
+	p.headerSub.TextSize = 10
 	tileBg := canvas.NewRectangle(palette.ChannelTileBG)
-	tileBg.CornerRadius = 8
-	tileBg.SetMinSize(fyne.NewSize(30, 30))
+	tileBg.CornerRadius = 7
+	tileBg.SetMinSize(fyne.NewSize(24, 24))
 	hash := canvas.NewText("#", palette.ChannelTileFG)
 	hash.TextStyle = fyne.TextStyle{Bold: true}
-	hash.TextSize = 15
+	hash.TextSize = 12
 	hash.Alignment = fyne.TextAlignCenter
 	tile := container.NewStack(tileBg, container.NewCenter(hash))
-	headerRow := container.NewHBox(
-		fixedWidthSpacer(12), tile, fixedWidthSpacer(10),
+	headerLeft := container.NewHBox(
+		fixedWidthSpacer(12), tile, fixedWidthSpacer(8),
 		container.NewVBox(p.headerTitle, p.headerSub),
 	)
-	headerBg := canvas.NewRectangle(palette.TopBarBG)
-	headerDiv := canvas.NewRectangle(color.NRGBA{R: 255, G: 255, B: 255, A: 14})
-	headerDiv.SetMinSize(fyne.NewSize(1, 1))
+	headerRow := container.NewBorder(nil, nil, headerLeft, fixedWidthSpacer(12), nil)
+	p.headerBg = canvas.NewRectangle(palette.PaneHeaderBG)
+	p.headerLine = canvas.NewRectangle(palette.PaneHeaderLine)
+	p.headerLine.SetMinSize(fyne.NewSize(1, 1))
 	p.header = container.NewStack(
-		headerBg,
-		container.NewBorder(layoutSpacerH(6), headerDiv, nil, nil, headerRow),
+		p.headerBg,
+		container.NewBorder(layoutSpacerH(5), p.headerLine, nil, nil, headerRow),
 	)
 
 	p.inputVisible = true
@@ -166,6 +164,15 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 			onActivate(p)
 		}
 	}, func() {
+		// Invalidate cached row heights asynchronously so wrapped text
+		// re-measures itself at the new container width.
+		go func() {
+			fyne.Do(func() {
+				if p.msgList != nil {
+					p.msgList.invalidateHeights()
+				}
+			})
+		}()
 		if onResized != nil {
 			onResized(p)
 		}
@@ -255,7 +262,22 @@ func (p *chatPane) refreshForTheme() {
 		p.inputBorder.StrokeWidth = 1
 		p.inputBorder.Refresh()
 	}
-
+	if p.headerBg != nil {
+		p.headerBg.FillColor = palette.PaneHeaderBG
+		p.headerBg.Refresh()
+	}
+	if p.headerLine != nil {
+		p.headerLine.FillColor = palette.PaneHeaderLine
+		p.headerLine.Refresh()
+	}
+	if p.headerTitle != nil {
+		p.headerTitle.Color = palette.MetaTextStrong
+		p.headerTitle.Refresh()
+	}
+	if p.headerSub != nil {
+		p.headerSub.Color = palette.SectionLabel
+		p.headerSub.Refresh()
+	}
 	if p.threadBg != nil {
 		p.threadBg.FillColor = theme.Color(theme.ColorNameHover)
 		p.threadBg.Refresh()
@@ -283,11 +305,12 @@ func (p *chatPane) scrollToBottomSoon() {
 	}()
 }
 
-func (p *chatPane) setMessages(msgs []api.Message, currentUserID, selfUserID string, win fyne.Window, showTimestamps bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error)) {
+func (p *chatPane) setMessages(msgs []api.Message, currentUserID, selfUserID string, win fyne.Window, showTimestamps bool, compact bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error)) {
 	p.msgList.setMessages(msgs, messageRenderCtx{
 		currentUserID:  currentUserID,
 		selfUserID:     selfUserID,
 		showTimestamps: showTimestamps,
+		compact:        compact,
 		inThreadView:   strings.TrimSpace(p.threadTS) != "",
 		win:            win,
 		onThread:       onThread,
@@ -300,8 +323,6 @@ func (p *chatPane) setMessages(msgs []api.Message, currentUserID, selfUserID str
 		p.scrollToBottomSoon()
 	}
 }
-
-
 
 // applyLocalReactions updates the rendered chips for one message in this
 // pane without triggering a full history reload. Returns false if the
@@ -319,4 +340,3 @@ func (p *chatPane) messageByTS(ts string) (api.Message, bool) {
 	}
 	return p.msgList.messageByTS(ts)
 }
-

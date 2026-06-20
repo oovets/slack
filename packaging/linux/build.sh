@@ -44,11 +44,17 @@ if [[ -z "${VERSION}" ]]; then
   usage
   exit 1
 fi
+if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+  echo "Invalid --version '${VERSION}'. Expected semver, for example 0.1.0 or 0.1.0-rc.1" >&2
+  exit 1
+fi
 
 mkdir -p "${DIST_DIR}"
 
 echo "==> Building binary"
-(cd "${ROOT_DIR}" && go build -trimpath -ldflags "-s -w" -o "${DIST_DIR}/slack-gui" ./cmd/slack-gui)
+(cd "${ROOT_DIR}" && go build -ldflags "-s -w" -o "${DIST_DIR}/slack-gui" ./cmd/slack-gui)
+cp "${ROOT_DIR}/README.md" "${DIST_DIR}/README.md"
+cp "${ROOT_DIR}/LICENSE" "${DIST_DIR}/LICENSE"
 
 if [[ ! -f "${PKG_DIR}/icons/256x256/slack-gui.png" ]]; then
   echo "warning: missing icon ${PKG_DIR}/icons/256x256/slack-gui.png"
@@ -58,7 +64,7 @@ if [[ ! -f "${PKG_DIR}/icons/512x512/slack-gui.png" ]]; then
 fi
 
 echo "==> Creating tar.gz"
-(cd "${DIST_DIR}" && tar -czf "slack-gui_${VERSION}_linux_amd64.tar.gz" slack-gui)
+(cd "${DIST_DIR}" && tar -czf "slack-gui_${VERSION}_linux_amd64.tar.gz" slack-gui README.md LICENSE)
 
 if command -v appimagetool >/dev/null 2>&1; then
   APPDIR="${DIST_DIR}/AppDir"
@@ -90,6 +96,6 @@ else
 fi
 
 echo "==> Checksums"
-(cd "${DIST_DIR}" && sha256sum * > "checksums_${VERSION}.txt")
+(cd "${DIST_DIR}" && find . -maxdepth 1 -type f ! -name "checksums_${VERSION}.txt" -printf '%P\0' | sort -z | xargs -0 sha256sum > "checksums_${VERSION}.txt")
 
 echo "Done. Artifacts are in ${DIST_DIR}"

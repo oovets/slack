@@ -402,7 +402,7 @@ var lightPalette = themePalette{
 
 func newCompactTheme() *compactTheme {
 	t := &compactTheme{
-		dark:     true,
+		dark:     false,
 		fontSize: defaultUIFontSize, // compact chat default; Fyne's built-in text size is 14
 		fonts:    make(map[string]fontSet),
 	}
@@ -536,12 +536,10 @@ func (t *compactTheme) Font(style fyne.TextStyle) fyne.Resource {
 func (t *compactTheme) Size(name fyne.ThemeSizeName) float32 {
 	switch name {
 	case theme.SizeNamePadding, theme.SizeNameInnerPadding:
-		// Fyne applies this padding between AND inside every widget, so keep it
-		// restrained — a small bump over the original 4, not a doubling.
 		if t.compactMode {
-			return 3
+			return 1
 		}
-		return 5
+		return 4
 	case theme.SizeNameInputRadius:
 		// redesign: softer corners on inputs, cards and the composer.
 		if t.compactMode {
@@ -554,7 +552,7 @@ func (t *compactTheme) Size(name fyne.ThemeSizeName) float32 {
 		return 0
 	case theme.SizeNameLineSpacing:
 		if t.compactMode {
-			return 1
+			return 0
 		}
 		return 2
 	case theme.SizeNameText:

@@ -33,4 +33,4 @@ Place your icon files here before release:
 - `packaging/linux/icons/256x256/slack-gui.png`
 - `packaging/linux/icons/512x512/slack-gui.png`
 
-If icons are missing, packaging still runs with placeholders, but desktop integration will be less polished.
+Release tarballs include the binary, `README.md`, and `LICENSE`. Checksums are written to `dist/checksums_<version>.txt`.

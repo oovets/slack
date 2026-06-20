@@ -30,6 +30,7 @@ type UserInfo struct {
 	Username    string
 	DisplayName string
 	RealName    string
+	AvatarURL   string
 	IsBot       bool
 	IsAppUser   bool
 }
@@ -111,6 +112,7 @@ type Message struct {
 	ThreadTS      string
 	UserID        string
 	Username      string
+	AvatarURL     string
 	Text          string
 	ForwardedText string
 	BotID         string
@@ -307,6 +309,7 @@ func (c *Client) UserDirectory() ([]UserInfo, error) {
 				Profile   struct {
 					DisplayName string `json:"display_name"`
 					RealName    string `json:"real_name"`
+					Image72     string `json:"image_72"`
 				} `json:"profile"`
 			} `json:"members"`
 			ResponseMetadata struct {
@@ -325,6 +328,7 @@ func (c *Client) UserDirectory() ([]UserInfo, error) {
 				Username:    strings.TrimSpace(m.Name),
 				DisplayName: strings.TrimSpace(m.Profile.DisplayName),
 				RealName:    strings.TrimSpace(m.Profile.RealName),
+				AvatarURL:   strings.TrimSpace(m.Profile.Image72),
 				IsBot:       m.IsBot,
 				IsAppUser:   m.IsAppUser,
 			})
@@ -354,6 +358,7 @@ func (c *Client) UserInfo(userID string) (*UserInfo, error) {
 			Profile   struct {
 				DisplayName string `json:"display_name"`
 				RealName    string `json:"real_name"`
+				Image72     string `json:"image_72"`
 			} `json:"profile"`
 		} `json:"user"`
 	}
@@ -365,6 +370,7 @@ func (c *Client) UserInfo(userID string) (*UserInfo, error) {
 		Username:    strings.TrimSpace(out.User.Name),
 		DisplayName: strings.TrimSpace(out.User.Profile.DisplayName),
 		RealName:    strings.TrimSpace(out.User.Profile.RealName),
+		AvatarURL:   strings.TrimSpace(out.User.Profile.Image72),
 		IsBot:       out.User.IsBot,
 		IsAppUser:   out.User.IsAppUser,
 	}, nil
@@ -582,10 +588,20 @@ type rawMessage struct {
 		DisplayName string `json:"display_name"`
 		RealName    string `json:"real_name"`
 		Name        string `json:"name"`
+		Image72     string `json:"image_72"`
 	} `json:"user_profile"`
 	BotProfile struct {
-		Name string `json:"name"`
+		Name    string `json:"name"`
+		Image72 string `json:"image_72"`
+		Icons   struct {
+			Image48 string `json:"image_48"`
+			Image72 string `json:"image_72"`
+		} `json:"icons"`
 	} `json:"bot_profile"`
+	Icons struct {
+		Image48 string `json:"image_48"`
+		Image72 string `json:"image_72"`
+	} `json:"icons"`
 	Files       []rawFile       `json:"files"`
 	Attachments []rawAttachment `json:"attachments"`
 	Reactions   []struct {
@@ -695,11 +711,28 @@ func (rm rawMessage) toMessage(userMap map[string]string) (Message, bool) {
 	if len(cards) == 0 && len(inlineImages) == 0 {
 		forwarded = extractForwardedText(rm.Attachments)
 	}
+	avatarURL := strings.TrimSpace(rm.UserProfile.Image72)
+	if avatarURL == "" {
+		avatarURL = strings.TrimSpace(rm.BotProfile.Icons.Image72)
+	}
+	if avatarURL == "" {
+		avatarURL = strings.TrimSpace(rm.BotProfile.Icons.Image48)
+	}
+	if avatarURL == "" {
+		avatarURL = strings.TrimSpace(rm.BotProfile.Image72)
+	}
+	if avatarURL == "" {
+		avatarURL = strings.TrimSpace(rm.Icons.Image72)
+	}
+	if avatarURL == "" {
+		avatarURL = strings.TrimSpace(rm.Icons.Image48)
+	}
 	return Message{
 		TS:            rm.TS,
 		ThreadTS:      rm.ThreadTS,
 		UserID:        rm.User,
 		Username:      username,
+		AvatarURL:     avatarURL,
 		Text:          text,
 		ForwardedText: forwarded,
 		BotID:         rm.BotID,

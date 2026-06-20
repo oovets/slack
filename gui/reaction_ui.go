@@ -16,7 +16,6 @@ import (
 	"github.com/stefan/slack-gui/api"
 )
 
-
 // ===== Reaction chips =====================================================
 
 // reactionChip is a Slack-style pill: rounded corners, hairline border,
@@ -24,12 +23,12 @@ import (
 // accent (blue) tint and a bold count.
 type reactionChip struct {
 	widget.BaseWidget
-	bg     *canvas.Rectangle
-	emoji  fyne.CanvasObject
-	count  *canvas.Text
-	onTap  func()
-	self   bool
-	hover  bool
+	bg    *canvas.Rectangle
+	emoji fyne.CanvasObject
+	count *canvas.Text
+	onTap func()
+	self  bool
+	hover bool
 }
 
 func newReactionChip(reaction api.Reaction, selfUserID string, onTap func()) fyne.CanvasObject {
@@ -45,18 +44,15 @@ func newReactionChip(reaction api.Reaction, selfUserID string, onTap func()) fyn
 	}
 
 	bgCol := palette.ChipBG
-	strokeCol := palette.ChipBorder
 	textCol := palette.ChipText
 	if self {
 		bgCol = palette.ChipSelfBG
-		strokeCol = palette.ChipSelfBorder
 		textCol = palette.ChipSelfText
 	}
 
 	bg := canvas.NewRectangle(bgCol)
-	bg.CornerRadius = 12
-	bg.StrokeColor = strokeCol
-	bg.StrokeWidth = 1
+	bg.CornerRadius = 10
+	bg.StrokeWidth = 0
 
 	emoji := newReactionEmojiView(reaction.Name)
 	count := canvas.NewText(fmt.Sprintf("%d", reaction.Count), textCol)
@@ -78,7 +74,11 @@ func (c *reactionChip) CreateRenderer() fyne.WidgetRenderer {
 	return &reactionChipRenderer{chip: c}
 }
 
-func (c *reactionChip) Tapped(_ *fyne.PointEvent)          { if c.onTap != nil { c.onTap() } }
+func (c *reactionChip) Tapped(_ *fyne.PointEvent) {
+	if c.onTap != nil {
+		c.onTap()
+	}
+}
 func (c *reactionChip) TappedSecondary(_ *fyne.PointEvent) {}
 func (c *reactionChip) Cursor() desktop.Cursor             { return desktop.PointerCursor }
 func (c *reactionChip) MouseIn(_ *desktop.MouseEvent) {
@@ -93,11 +93,15 @@ func (c *reactionChip) MouseMoved(_ *desktop.MouseEvent) {}
 
 func (c *reactionChip) applyHoverTint() {
 	if c.hover {
-		c.bg.StrokeColor = mixColor(c.bg.StrokeColor, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, 0.18)
+		if c.self {
+			c.bg.FillColor = mixColor(palette.ChipSelfBG, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, 0.12)
+		} else {
+			c.bg.FillColor = mixColor(palette.ChipBG, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, 0.1)
+		}
 	} else if c.self {
-		c.bg.StrokeColor = palette.ChipSelfBorder
+		c.bg.FillColor = palette.ChipSelfBG
 	} else {
-		c.bg.StrokeColor = palette.ChipBorder
+		c.bg.FillColor = palette.ChipBG
 	}
 	c.bg.Refresh()
 }
@@ -107,13 +111,11 @@ func (c *reactionChip) applyHoverTint() {
 type reactionChipRenderer struct{ chip *reactionChip }
 
 const (
-	chipPadX   = float32(5)
+	chipPadX   = float32(4)
 	chipPadY   = float32(0)
 	chipInnerG = float32(3)
-	chipMinH   = float32(18)
+	chipMinH   = float32(16)
 )
-
-
 
 func (r *reactionChipRenderer) MinSize() fyne.Size {
 	em := r.chip.emoji.MinSize()
@@ -188,8 +190,7 @@ func newIconActionButton(_glyph, _tooltip string, onTap func()) fyne.CanvasObjec
 func newIconChipButton(res fyne.Resource, onTap func()) fyne.CanvasObject {
 	bg := canvas.NewRectangle(palette.ChipAddBG)
 	bg.CornerRadius = 10
-	bg.StrokeColor = palette.ChipAddBorder
-	bg.StrokeWidth = 1
+	bg.StrokeWidth = 0
 
 	icon := canvas.NewImageFromResource(res)
 	icon.FillMode = canvas.ImageFillContain
@@ -208,17 +209,19 @@ type iconChipBtn struct {
 }
 
 func (b *iconChipBtn) CreateRenderer() fyne.WidgetRenderer { return &iconChipBtnRenderer{btn: b} }
-func (b *iconChipBtn) Tapped(_ *fyne.PointEvent)           { if b.onTap != nil { b.onTap() } }
-func (b *iconChipBtn) TappedSecondary(_ *fyne.PointEvent)  {}
-func (b *iconChipBtn) Cursor() desktop.Cursor              { return desktop.PointerCursor }
+func (b *iconChipBtn) Tapped(_ *fyne.PointEvent) {
+	if b.onTap != nil {
+		b.onTap()
+	}
+}
+func (b *iconChipBtn) TappedSecondary(_ *fyne.PointEvent) {}
+func (b *iconChipBtn) Cursor() desktop.Cursor             { return desktop.PointerCursor }
 func (b *iconChipBtn) MouseIn(_ *desktop.MouseEvent) {
 	b.bg.FillColor = palette.ThreadHoverBG
-	b.bg.StrokeColor = mixColor(palette.ChipAddBorder, color.NRGBA{R: 255, G: 255, B: 255, A: 255}, 0.45)
 	b.bg.Refresh()
 }
 func (b *iconChipBtn) MouseOut() {
 	b.bg.FillColor = palette.ChipAddBG
-	b.bg.StrokeColor = palette.ChipAddBorder
 	b.bg.Refresh()
 }
 func (b *iconChipBtn) MouseMoved(_ *desktop.MouseEvent) {}
@@ -236,12 +239,11 @@ func (r *iconChipBtnRenderer) Layout(size fyne.Size) {
 	r.btn.icon.Move(fyne.NewPos((size.Width-iconSize)/2, (size.Height-iconSize)/2))
 	r.btn.icon.Resize(fyne.NewSize(iconSize, iconSize))
 }
-func (r *iconChipBtnRenderer) Refresh()                     { r.btn.bg.Refresh(); r.btn.icon.Refresh() }
-func (r *iconChipBtnRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.btn.bg, r.btn.icon} }
-func (r *iconChipBtnRenderer) Destroy()                     {}
-
-
-
+func (r *iconChipBtnRenderer) Refresh() { r.btn.bg.Refresh(); r.btn.icon.Refresh() }
+func (r *iconChipBtnRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{r.btn.bg, r.btn.icon}
+}
+func (r *iconChipBtnRenderer) Destroy() {}
 
 // ===== Color helpers =====================================================
 
@@ -276,8 +278,6 @@ var commonReactionEmojis = []string{
 
 const emojiPickerMaxResults = 48
 const emojiPickerColumns = 8
-
-
 
 var (
 	emojiNamesCache    []string
@@ -385,10 +385,10 @@ func filterEmojiNames(query string, maxResults int) []string {
 // shortcode in a footer; we keep the label inside the cell as a tooltip).
 type pickerCell struct {
 	widget.BaseWidget
-	bg     *canvas.Rectangle
-	emoji  fyne.CanvasObject
-	name   string
-	onTap  func()
+	bg      *canvas.Rectangle
+	emoji   fyne.CanvasObject
+	name    string
+	onTap   func()
 	onHover func(string)
 }
 
@@ -396,10 +396,10 @@ func newPickerCell(name string, onTap func(), onHover func(string)) *pickerCell 
 	bg := canvas.NewRectangle(palette.PickerCellBG)
 	bg.CornerRadius = 6
 	c := &pickerCell{
-		bg:     bg,
-		emoji:  newReactionEmojiView(name),
-		name:   name,
-		onTap:  onTap,
+		bg:      bg,
+		emoji:   newReactionEmojiView(name),
+		name:    name,
+		onTap:   onTap,
 		onHover: onHover,
 	}
 	c.ExtendBaseWidget(c)
@@ -409,7 +409,11 @@ func newPickerCell(name string, onTap func(), onHover func(string)) *pickerCell 
 func (c *pickerCell) CreateRenderer() fyne.WidgetRenderer {
 	return &pickerCellRenderer{cell: c}
 }
-func (c *pickerCell) Tapped(_ *fyne.PointEvent)          { if c.onTap != nil { c.onTap() } }
+func (c *pickerCell) Tapped(_ *fyne.PointEvent) {
+	if c.onTap != nil {
+		c.onTap()
+	}
+}
 func (c *pickerCell) TappedSecondary(_ *fyne.PointEvent) {}
 func (c *pickerCell) Cursor() desktop.Cursor             { return desktop.PointerCursor }
 func (c *pickerCell) MouseIn(_ *desktop.MouseEvent) {
@@ -441,7 +445,6 @@ func (r *pickerCellRenderer) MinSize() fyne.Size {
 		side = 26
 	}
 
-
 	return fyne.NewSize(side, side)
 }
 func (r *pickerCellRenderer) Layout(size fyne.Size) {
@@ -451,9 +454,11 @@ func (r *pickerCellRenderer) Layout(size fyne.Size) {
 	r.cell.emoji.Move(fyne.NewPos((size.Width-s.Width)/2, (size.Height-s.Height)/2))
 	r.cell.emoji.Resize(s)
 }
-func (r *pickerCellRenderer) Refresh()                     { r.cell.bg.Refresh(); r.cell.emoji.Refresh() }
-func (r *pickerCellRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.cell.bg, r.cell.emoji} }
-func (r *pickerCellRenderer) Destroy()                     {}
+func (r *pickerCellRenderer) Refresh() { r.cell.bg.Refresh(); r.cell.emoji.Refresh() }
+func (r *pickerCellRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{r.cell.bg, r.cell.emoji}
+}
+func (r *pickerCellRenderer) Destroy() {}
 
 func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 	if win == nil {

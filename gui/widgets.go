@@ -13,8 +13,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// fixedWidthWrap wraps a child widget with a fixed minimum width and can be
-// hidden by setting show=false (returns zero size).
+// fixedWidthWrap wraps a child widget with a fixed minimum width.
+// Use setShown to toggle visibility — it hides the child AND collapses MinSize.
 type fixedWidthWrap struct {
 	widget.BaseWidget
 	child fyne.CanvasObject
@@ -26,6 +26,16 @@ func newFixedWidthWrap(child fyne.CanvasObject, width float32) *fixedWidthWrap {
 	w := &fixedWidthWrap{child: child, width: width, show: true}
 	w.ExtendBaseWidget(w)
 	return w
+}
+
+func (w *fixedWidthWrap) setShown(visible bool) {
+	w.show = visible
+	if visible {
+		w.child.Show()
+	} else {
+		w.child.Hide()
+	}
+	w.Refresh()
 }
 
 func (w *fixedWidthWrap) CreateRenderer() fyne.WidgetRenderer {

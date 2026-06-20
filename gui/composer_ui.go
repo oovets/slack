@@ -52,7 +52,11 @@ type primarySendButton struct {
 func (b *primarySendButton) CreateRenderer() fyne.WidgetRenderer {
 	return &primarySendButtonRenderer{b: b}
 }
-func (b *primarySendButton) Tapped(_ *fyne.PointEvent)          { if b.onTap != nil { b.onTap() } }
+func (b *primarySendButton) Tapped(_ *fyne.PointEvent) {
+	if b.onTap != nil {
+		b.onTap()
+	}
+}
 func (b *primarySendButton) TappedSecondary(_ *fyne.PointEvent) {}
 func (b *primarySendButton) Cursor() desktop.Cursor             { return desktop.PointerCursor }
 func (b *primarySendButton) MouseIn(_ *desktop.MouseEvent) {
@@ -75,9 +79,11 @@ func (r *primarySendButtonRenderer) Layout(s fyne.Size) {
 	r.b.icon.Move(fyne.NewPos((s.Width-ic)/2, (s.Height-ic)/2))
 	r.b.icon.Resize(fyne.NewSize(ic, ic))
 }
-func (r *primarySendButtonRenderer) Refresh()                     { r.b.bg.Refresh(); r.b.icon.Refresh() }
-func (r *primarySendButtonRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.b.bg, r.b.icon} }
-func (r *primarySendButtonRenderer) Destroy()                     {}
+func (r *primarySendButtonRenderer) Refresh() { r.b.bg.Refresh(); r.b.icon.Refresh() }
+func (r *primarySendButtonRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{r.b.bg, r.b.icon}
+}
+func (r *primarySendButtonRenderer) Destroy() {}
 
 // =========================================================================
 // Formatting toolbar — B / I / S / link / code / emoji ghost-icon buttons.
@@ -170,9 +176,13 @@ type ghostIcon struct {
 }
 
 func (g *ghostIcon) CreateRenderer() fyne.WidgetRenderer { return &ghostIconRenderer{g: g} }
-func (g *ghostIcon) Tapped(_ *fyne.PointEvent)           { if g.onTap != nil { g.onTap() } }
-func (g *ghostIcon) TappedSecondary(_ *fyne.PointEvent)  {}
-func (g *ghostIcon) Cursor() desktop.Cursor              { return desktop.PointerCursor }
+func (g *ghostIcon) Tapped(_ *fyne.PointEvent) {
+	if g.onTap != nil {
+		g.onTap()
+	}
+}
+func (g *ghostIcon) TappedSecondary(_ *fyne.PointEvent) {}
+func (g *ghostIcon) Cursor() desktop.Cursor             { return desktop.PointerCursor }
 func (g *ghostIcon) MouseIn(_ *desktop.MouseEvent) {
 	g.bg.FillColor = color.NRGBA{R: 255, G: 255, B: 255, A: 18}
 	g.bg.Refresh()
@@ -198,41 +208,3 @@ func (r *ghostIconRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{r.g.bg, r.g.icon}
 }
 func (r *ghostIconRenderer) Destroy() {}
-
-// =========================================================================
-// Channel header — purple "#"-tile + channel name + topic.
-// Painted at the top of every chat pane viewport.
-// =========================================================================
-
-func newChannelHeader(name, topic string) fyne.CanvasObject {
-	tile := canvas.NewRectangle(palette.ChannelTileBG)
-	tile.CornerRadius = 8
-	tile.SetMinSize(fyne.NewSize(32, 32))
-	hash := canvas.NewText("#", palette.ChannelTileFG)
-	hash.TextStyle = fyne.TextStyle{Bold: true}
-	hash.TextSize = 16
-	hash.Alignment = fyne.TextAlignCenter
-	tileStack := container.NewStack(tile, container.NewCenter(hash))
-
-	displayName := strings.TrimSpace(name)
-	if displayName == "" {
-		displayName = "channel"
-	}
-	title := canvas.NewText(displayName, color.NRGBA{R: 240, G: 242, B: 247, A: 255})
-	title.TextStyle = fyne.TextStyle{Bold: true}
-	title.TextSize = 14
-
-	textCol := container.NewVBox(title)
-	if t := strings.TrimSpace(topic); t != "" {
-		sub := canvas.NewText(t, palette.SectionLabel)
-		sub.TextSize = 11
-		textCol = container.NewVBox(title, sub)
-	}
-
-	row := container.NewHBox(fixedWidthSpacer(12), tileStack, fixedWidthSpacer(10), textCol)
-	bg := canvas.NewRectangle(palette.TopBarBG)
-	divider := canvas.NewRectangle(color.NRGBA{R: 255, G: 255, B: 255, A: 12})
-	divider.SetMinSize(fyne.NewSize(1, 1))
-	pad := container.NewBorder(layoutSpacerH(6), divider, nil, nil, row)
-	return container.NewStack(bg, pad)
-}

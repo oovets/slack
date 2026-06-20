@@ -23,7 +23,6 @@ func newMessageBody(rawText string, isFromMe bool) fyne.CanvasObject {
 		lbl.Wrapping = fyne.TextWrapWord
 		if isFromMe {
 			lbl.Alignment = fyne.TextAlignTrailing
-			lbl.Importance = widget.LowImportance
 		}
 		return lbl
 	}
@@ -62,11 +61,8 @@ func newMessageBody(rawText string, isFromMe bool) fyne.CanvasObject {
 	return body
 }
 
-func inlineBodyColor(isFromMe bool) color.Color {
-	if isFromMe {
-		return color.NRGBA{R: 175, G: 184, B: 198, A: 230}
-	}
-	return color.NRGBA{R: 212, G: 218, B: 232, A: 255}
+func inlineBodyColor(_ bool) color.Color {
+	return theme.Color(theme.ColorNameForeground)
 }
 
 func inlineBodyTextSize() float32 {
@@ -246,7 +242,7 @@ func newInlineEmoji(name string) fyne.CanvasObject {
 }
 
 func newPendingEmojiHost(label string, size float32) (*fyne.Container, *canvas.Image, *canvas.Text) {
-	fallback := canvas.NewText(label, color.NRGBA{R: 175, G: 184, B: 198, A: 230})
+	fallback := canvas.NewText(label, theme.Color(theme.ColorNameForeground))
 	fallback.TextSize = inlineBodyTextSize()
 	img := canvas.NewImageFromResource(nil)
 	img.FillMode = canvas.ImageFillContain
@@ -256,7 +252,7 @@ func newPendingEmojiHost(label string, size float32) (*fyne.Container, *canvas.I
 }
 
 func inlineEmojiFallback(name string) fyne.CanvasObject {
-	t := canvas.NewText(formatReactionToken(name), color.NRGBA{R: 175, G: 184, B: 198, A: 230})
+	t := canvas.NewText(formatReactionToken(name), theme.Color(theme.ColorNameForeground))
 	t.TextSize = inlineBodyTextSize()
 	return t
 }

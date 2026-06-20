@@ -1,20 +1,33 @@
-# dependencies
-node_modules/
+# Go
+bin/
+coverage.out
+*.test
+slack-gui
 
-# Next.js
-.next/
-out/
-
-# production
+# Release artifacts
 build/
 dist/
+*.tgz
+*.tar.gz
+*.zip
+*.AppImage
+*.deb
+*.rpm
+checksums_*.txt
 
-# local environment
+# Local credentials and environment
 .env
 .env.*
 !.env.example
+.slack_config.json
+*.log
 
-# logs
+# JS tooling used by hosted preview harnesses
+node_modules/
+.next/
+out/
+
+# JS package manager logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -25,10 +38,6 @@ bun-debug.log*
 .DS_Store
 *.swp
 
-# TypeScript
+# TypeScript / Next.js generated files
 *.tsbuildinfo
 next-env.d.ts
-
-# local archives
-*.tgz
-*.tar.gz

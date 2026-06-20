@@ -30,9 +30,10 @@ var (
 	workspaceEmojiMu         sync.RWMutex
 	workspaceEmojiURLByKey   = map[string]string{}
 	workspaceEmojiAliasByKey = map[string]string{}
+	avatarImageCache         sync.Map // url → fyne.Resource
 )
 
-func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID string, win fyne.Window, showTimestamps bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error), showHeader bool, inThreadView bool) fyne.CanvasObject {
+func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID string, win fyne.Window, showTimestamps bool, compact bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error), showHeader bool, inThreadView bool) fyne.CanvasObject {
 	name := senderName(m)
 	ts := canvas.NewText(formatHoverTimestamp(m.Time), color.NRGBA{R: 100, G: 106, B: 130, A: 190})
 	ts.TextSize = hoverTimestampTextSize()
@@ -45,7 +46,6 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 		quoteText := widget.NewLabel("↪ " + preview)
 		quoteText.Wrapping = fyne.TextWrapWord
 		quoteText.TextStyle = fyne.TextStyle{Italic: true}
-		quoteText.Importance = widget.LowImportance
 		quoteTextRow := container.NewPadded(quoteText)
 		quoteBg := canvas.NewRectangle(color.NRGBA{R: 92, G: 99, B: 126, A: 22})
 		quoteBg.StrokeWidth = 0
@@ -94,8 +94,6 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 			rowWithMeta.Add(alignOutgoingRow(actionsRow, isFromMe))
 		}
 	}
-
-
 
 	var content *fyne.Container
 	if showHeader {
@@ -151,23 +149,28 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 	// messages indent under an empty gutter so the column stays aligned (Slack-style).
 	var bodyWithAvatar fyne.CanvasObject = content
 	if !isFromMe {
-		avatarSize := float32(34)
+		avatarSize := float32(32)
+		if compact {
+			avatarSize = 20
+		}
+		avatarGap := float32(6)
+		if compact {
+			avatarGap = 4
+		}
 		var gutter fyne.CanvasObject
 		if showHeader {
-			gutter = newAvatarBubble(name, avatarSize)
+			gutter = newAvatarBubble(name, m.AvatarURL, avatarSize)
 		} else {
 			gutter = fixedWidthSpacer(avatarSize)
 		}
 		leftCol := container.NewVBox(gutter)
-		bodyWithAvatar = container.NewBorder(nil, nil, container.NewHBox(leftCol, fixedWidthSpacer(8)), nil, content)
+		bodyWithAvatar = container.NewBorder(nil, nil, container.NewHBox(leftCol, fixedWidthSpacer(avatarGap)), nil, content)
 	}
 	rowCanvas := applyMessageSideIndent(bodyWithAvatar)
 	if !showTimestamps {
 		rowCanvas = newTimestampToggleRow(rowCanvas, formatHoverTimestamp(m.Time), isFromMe)
 	}
-	// Add a small breath of space above the first message in a sender group
-	// (Slack-native: sender clusters get ~8px of vertical separation).
-	if showHeader {
+	if showHeader && !compact {
 		rowCanvas = container.NewVBox(fixedHeightSpacer(4), rowCanvas)
 	}
 	if !isFromMe && mentionedMe {
@@ -193,9 +196,7 @@ func fixedHeightSpacer(height float32) fyne.CanvasObject {
 // muted reply count. Tapping opens the thread view.
 func newThreadReplyBar(count int, onTap func()) fyne.CanvasObject {
 	bg := canvas.NewRectangle(color.Transparent)
-	bg.CornerRadius = 8
-	bg.StrokeColor = color.Transparent
-	bg.StrokeWidth = 1
+	bg.CornerRadius = 6
 
 	countText := canvas.NewText(fmt.Sprintf("%d %s", count, pluralizeReplies(count)), palette.ThreadAccent)
 	countText.TextSize = messageMetaActionTextSize()
@@ -234,23 +235,22 @@ type threadReplyBar struct {
 func (b *threadReplyBar) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(b.content)
 }
-func (b *threadReplyBar) Tapped(_ *fyne.PointEvent)          { if b.onTap != nil { b.onTap() } }
+func (b *threadReplyBar) Tapped(_ *fyne.PointEvent) {
+	if b.onTap != nil {
+		b.onTap()
+	}
+}
 func (b *threadReplyBar) TappedSecondary(_ *fyne.PointEvent) {}
 func (b *threadReplyBar) MouseIn(_ *desktop.MouseEvent) {
 	b.bg.FillColor = palette.ThreadHoverBG
-	b.bg.StrokeColor = palette.ChipBorder
 	b.bg.Refresh()
 }
 func (b *threadReplyBar) MouseOut() {
 	b.bg.FillColor = color.Transparent
-	b.bg.StrokeColor = color.Transparent
 	b.bg.Refresh()
 }
 func (b *threadReplyBar) MouseMoved(_ *desktop.MouseEvent) {}
-func (b *threadReplyBar) Cursor() desktop.Cursor            { return desktop.PointerCursor }
-
-
-
+func (b *threadReplyBar) Cursor() desktop.Cursor           { return desktop.PointerCursor }
 
 func senderName(m api.Message) string {
 	if s := strings.TrimSpace(m.Username); s != "" {
@@ -282,15 +282,63 @@ func avatarInitials(name string) string {
 	return strings.ToUpper(string(r[:1]))
 }
 
-// newAvatarBubble draws a circular, color-coded initials avatar for a sender.
-func newAvatarBubble(name string, size float32) fyne.CanvasObject {
+// newAvatarBubble draws an avatar for a sender. If avatarURL is non-empty the
+// real profile photo is fetched asynchronously and swapped in; until it loads
+// (or if it fails) an initials bubble is shown as a fallback.
+func newAvatarBubble(name, avatarURL string, size float32) fyne.CanvasObject {
 	circle := canvas.NewCircle(senderColor(name, false))
 	initials := canvas.NewText(avatarInitials(name), color.NRGBA{R: 255, G: 255, B: 255, A: 255})
 	initials.TextStyle = fyne.TextStyle{Bold: true}
 	initials.TextSize = size * 0.4
 	initials.Alignment = fyne.TextAlignCenter
-	stacked := container.NewMax(circle, container.NewCenter(initials))
-	return container.NewGridWrap(fyne.NewSize(size, size), stacked)
+	fallback := container.NewMax(circle, container.NewCenter(initials))
+
+	if strings.TrimSpace(avatarURL) == "" {
+		return container.NewGridWrap(fyne.NewSize(size, size), fallback)
+	}
+
+	img := canvas.NewImageFromResource(nil)
+	img.FillMode = canvas.ImageFillContain
+	img.Hide()
+	host := container.NewMax(fallback, img)
+	wrap := container.NewGridWrap(fyne.NewSize(size, size), host)
+
+	if res, ok := avatarImageCache.Load(avatarURL); ok {
+		if r, ok := res.(fyne.Resource); ok && r != nil {
+			img.Resource = r
+			img.Show()
+			fallback.Hide()
+		}
+		return wrap
+	}
+
+	go func() {
+		res, err := fetchAvatarImage(avatarURL)
+		if err != nil || res == nil {
+			return
+		}
+		avatarImageCache.Store(avatarURL, res)
+		fyne.Do(func() {
+			img.Resource = res
+			img.Show()
+			fallback.Hide()
+			wrap.Refresh()
+		})
+	}()
+	return wrap
+}
+
+func fetchAvatarImage(rawURL string) (fyne.Resource, error) {
+	resp, err := http.Get(rawURL) //nolint:noctx
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil || len(data) == 0 {
+		return nil, err
+	}
+	return fyne.NewStaticResource("avatar", data), nil
 }
 
 func senderColor(name string, isFromMe bool) color.Color {
@@ -572,10 +620,24 @@ func convertSlackLinks(text string) string {
 		token := text[i+1 : end]
 		switch {
 		case strings.HasPrefix(token, "!"):
-			out.WriteString("@" + strings.TrimPrefix(token, "!"))
+			special := strings.SplitN(strings.TrimPrefix(token, "!"), "|", 2)[0]
+			out.WriteString("@" + special)
 		case strings.Contains(token, "|"):
 			parts := strings.SplitN(token, "|", 2)
-			out.WriteString(parts[1])
+			label := strings.TrimSpace(parts[1])
+			if label == "" {
+				label = strings.TrimSpace(parts[0])
+			}
+			// User/channel mentions keep the @ prefix.
+			if strings.HasPrefix(parts[0], "@") || strings.HasPrefix(parts[0], "U") || strings.HasPrefix(parts[0], "W") {
+				if !strings.HasPrefix(label, "@") {
+					label = "@" + label
+				}
+			}
+			out.WriteString(label)
+		case strings.HasPrefix(token, "@") || strings.HasPrefix(token, "U") || strings.HasPrefix(token, "W"):
+			// Bare user mention without display name, keep @ prefix so it's recognisable.
+			out.WriteString("@" + token)
 		default:
 			out.WriteString(token)
 		}
@@ -642,7 +704,6 @@ func newReactionEmojiView(name string) fyne.CanvasObject {
 			return img
 		}
 		fallback := widget.NewLabel(token)
-		fallback.Importance = widget.LowImportance
 		img := canvas.NewImageFromResource(nil)
 		img.FillMode = canvas.ImageFillContain
 		img.SetMinSize(fyne.NewSize(emojiSize, emojiSize))

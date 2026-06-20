@@ -22,6 +22,7 @@ type messageRenderCtx struct {
 	selfUserID     string
 	showTimestamps bool
 	inThreadView   bool
+	compact        bool
 	win            fyne.Window
 	onThread       func(api.Message)
 	onReply        func(api.Message)
@@ -101,7 +102,7 @@ func (v *virtualMessageList) renderRow(i int) fyne.CanvasObject {
 		showHeader = true
 	}
 	mentionedMe := m.MentionedMe || messageMentionsUser(m.Text, v.ctx.selfUserID)
-	return renderMessageRow(m, isFromMe, mentionedMe, v.ctx.selfUserID, v.ctx.win, v.ctx.showTimestamps, v.ctx.onThread, v.ctx.onReply, v.ctx.onMedia, v.ctx.onReaction, v.ctx.fetchMedia, showHeader, v.ctx.inThreadView)
+	return renderMessageRow(m, isFromMe, mentionedMe, v.ctx.selfUserID, v.ctx.win, v.ctx.showTimestamps, v.ctx.compact, v.ctx.onThread, v.ctx.onReply, v.ctx.onMedia, v.ctx.onReaction, v.ctx.fetchMedia, showHeader, v.ctx.inThreadView)
 }
 
 // setMessages swaps in a new history and refreshes the visible window only.
@@ -122,6 +123,14 @@ func (v *virtualMessageList) clear() {
 }
 
 func (v *virtualMessageList) scrollToBottom() { v.list.ScrollToBottom() }
+
+// invalidateHeights clears the row-height cache so that on the next render
+// pass every row re-measures itself. Call this after the container is resized
+// so text that wraps at a new width gets the correct height allocated.
+func (v *virtualMessageList) invalidateHeights() {
+	v.heights = map[int]float32{}
+	v.list.Refresh()
+}
 
 // applyLocalReactions swaps in a new reactions slice for the message with
 // the given TS and asks the underlying list to redraw only that one row,

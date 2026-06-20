@@ -1,0 +1,10 @@
+{
+  "active_workspace": 0,
+  "workspaces": [
+    {
+      "name": "Example Workspace",
+      "token": "xoxb-your-token",
+      "app_token": "xapp-your-app-token"
+    }
+  ]
+}

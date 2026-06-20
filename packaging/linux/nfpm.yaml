@@ -4,7 +4,7 @@ platform: linux
 version: "${VERSION}"
 section: default
 priority: optional
-maintainer: Slack GUI Maintainers <maintainers@example.com>
+maintainer: Stefan <stefan@users.noreply.github.com>
 description: |
   Lightweight Slack desktop client built with Go and Fyne.
 vendor: slack-gui

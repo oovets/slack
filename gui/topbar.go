@@ -13,63 +13,6 @@ import (
 	"github.com/stefan/slack-gui/api"
 )
 
-
-// =========================================================================
-// Top bar — title block on the left, segmented Cozy/Compact + light/dark
-// toggle on the right. Painted with palette.TopBarBG so it reads as a
-// distinct strip above the workspace rail and sidebar.
-// =========================================================================
-
-func (a *App) buildTopBar() fyne.CanvasObject {
-	bg := canvas.NewRectangle(palette.TopBarBG)
-
-	title := canvas.NewText("Slack", color.NRGBA{R: 240, G: 242, B: 247, A: 255})
-	title.TextStyle = fyne.TextStyle{Bold: true}
-	title.TextSize = 13
-	if a.info != nil && a.info.TeamName != "" {
-		title.Text = a.info.TeamName
-	}
-	subtitle := canvas.NewText("Slack desktop client", palette.SectionLabel)
-	subtitle.TextSize = 11
-	titleBlock := container.NewHBox(
-		fixedWidthSpacer(8),
-		container.NewVBox(canvas.NewRectangle(color.Transparent), title, subtitle, canvas.NewRectangle(color.Transparent)),
-	)
-
-	density := newSegmented([]string{"Cozy", "Compact"}, btoi(a.appTheme.compactMode), func(i int) {
-		a.setCompactMode(i == 1)
-	})
-	themeBtn := newIconChipButton(themeToggleIcon(a.appTheme.dark), func() {
-		a.setDarkMode(!a.appTheme.dark)
-	})
-
-	right := container.NewHBox(
-		density,
-		fixedWidthSpacer(8),
-		themeBtn,
-		fixedWidthSpacer(10),
-	)
-
-	row := container.NewBorder(nil, nil, titleBlock, right, layoutSpacer())
-	pad := container.NewPadded(row)
-	stack := container.NewStack(bg, pad)
-	// Fix a slim top bar height.
-	stack.Resize(fyne.NewSize(0, 42))
-	return stack
-}
-
-func themeToggleIcon(dark bool) fyne.Resource {
-	if dark {
-		return theme.ColorPaletteIcon()
-	}
-	return theme.ColorPaletteIcon()
-}
-
-func layoutSpacer() fyne.CanvasObject {
-	r := canvas.NewRectangle(color.Transparent)
-	return r
-}
-
 func btoi(b bool) int {
 	if b {
 		return 1
@@ -84,6 +27,7 @@ func btoi(b bool) int {
 
 func (a *App) buildWorkspaceRail() fyne.CanvasObject {
 	bg := canvas.NewRectangle(palette.RailBG)
+	a.railBg = bg
 
 	tile := newWorkspaceTile(a.info)
 	homeIcon := newRailIcon(theme.HomeIcon())
@@ -148,7 +92,6 @@ func newWorkspaceTile(info *api.AuthInfo) fyne.CanvasObject {
 	}
 	return newWorkspaceTileFromInitials(name, color.NRGBA{R: 99, G: 102, B: 241, A: 255})
 }
-
 
 func newWorkspaceTileFromInitials(initials string, bgCol color.NRGBA) fyne.CanvasObject {
 	bg := canvas.NewRectangle(bgCol)
@@ -220,9 +163,13 @@ func newRailIcon(res fyne.Resource) *railIcon {
 }
 
 func (r *railIcon) CreateRenderer() fyne.WidgetRenderer { return &railIconRenderer{r: r} }
-func (r *railIcon) Tapped(_ *fyne.PointEvent)           { if r.onTap != nil { r.onTap() } }
-func (r *railIcon) TappedSecondary(_ *fyne.PointEvent)  {}
-func (r *railIcon) Cursor() desktop.Cursor              { return desktop.PointerCursor }
+func (r *railIcon) Tapped(_ *fyne.PointEvent) {
+	if r.onTap != nil {
+		r.onTap()
+	}
+}
+func (r *railIcon) TappedSecondary(_ *fyne.PointEvent) {}
+func (r *railIcon) Cursor() desktop.Cursor             { return desktop.PointerCursor }
 func (r *railIcon) MouseIn(_ *desktop.MouseEvent) {
 	r.bg.FillColor = color.NRGBA{R: 255, G: 255, B: 255, A: 18}
 	r.bg.Refresh()
@@ -370,7 +317,11 @@ func (c *segmentCell) setActive(on bool) {
 func (c *segmentCell) CreateRenderer() fyne.WidgetRenderer {
 	return &segmentCellRenderer{c: c}
 }
-func (c *segmentCell) Tapped(_ *fyne.PointEvent)          { if c.onTap != nil { c.onTap() } }
+func (c *segmentCell) Tapped(_ *fyne.PointEvent) {
+	if c.onTap != nil {
+		c.onTap()
+	}
+}
 func (c *segmentCell) TappedSecondary(_ *fyne.PointEvent) {}
 func (c *segmentCell) Cursor() desktop.Cursor             { return desktop.PointerCursor }
 

@@ -2,14 +2,20 @@
 
 Standalone Slack desktop client built with Go and Fyne.
 
+This is an unofficial client and is not affiliated with, endorsed by, or
+supported by Slack Technologies, LLC.
+
 ## Project Layout
 
 - `api` - Slack API client (channels, history, threads, media)
 - `gui` - Fyne UI (pane layout, message rendering, realtime updates)
+- `cmd/slack-gui` - desktop app entrypoint and credential loading
+- `packaging/linux` - Linux release packaging scripts and metadata
 
 ## Requirements
 
 - Go 1.24+
+- Linux desktop build dependencies required by Fyne (`gcc`, OpenGL, X11/Wayland headers)
 - Slack token with scopes for conversations, history, posting, and users
 
 Recommended Slack scopes:
@@ -26,6 +32,17 @@ Recommended Slack scopes:
 - `users:read`
 - `users:read.email` (optional)
 - `emoji:read` (optional, enables workspace emoji/reaction mapping)
+
+## Quick Start
+
+```bash
+cp .env.example .env
+$EDITOR .env
+set -a
+. ./.env
+set +a
+go run ./cmd/slack-gui
+```
 
 ## Configuration
 
@@ -47,6 +64,17 @@ export SLACK_CONFIG_PATH="/path/to/.slack_config.json" # optional override
 Auto-discovered config locations:
 
 - `./.slack_config.json`
+- `~/.slack_config.json`
+
+Example config file:
+
+```bash
+cp .slack_config.example.json .slack_config.json
+$EDITOR .slack_config.json
+```
+
+Never commit real Slack tokens. `.env` and `.slack_config.json` are ignored by
+default.
 
 ## Build and Run
 
@@ -58,19 +86,39 @@ go build -o slack-gui ./cmd/slack-gui
 
 Logs are written to `~/.slack-gui.log`.
 
+## Development
+
+```bash
+go fmt ./...
+go vet ./...
+go test ./...
+go build -o dist/slack-gui ./cmd/slack-gui
+```
+
+The tracked `package.json` exists for preview tooling and simply forwards
+useful scripts to Go:
+
+```bash
+npm run test
+npm run build
+```
+
 ## Release Checklist
 
 ```bash
 go fmt ./...
+go vet ./...
 go test ./...
-go build -o slack-gui ./cmd/slack-gui
-```
-
-Optional packaging build:
-
-```bash
+go build -o dist/slack-gui ./cmd/slack-gui
 ./packaging/linux/build.sh --version 0.1.0
 ```
+
+Before publishing a public release:
+
+- Confirm `git status --short` only contains intentional changes.
+- Confirm no real tokens are present in `.env`, `.slack_config.json`, logs, or release artifacts.
+- Review `LICENSE`, `THIRD_PARTY_NOTICES.md`, and `SECURITY.md`.
+- Attach artifacts from `dist/` plus `dist/checksums_<version>.txt`.
 
 ## Linux Packaging
 

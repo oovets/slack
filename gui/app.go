@@ -24,7 +24,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
-	
+
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/stefan/slack-gui/api"
@@ -33,6 +33,16 @@ import (
 const appID = "com.bluebubbles-tui.slackgui"
 
 var privateChannelLockIcon = fyne.NewStaticResource("private-lock.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8f96ab" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`))
+
+// Sidebar row icons — one per channel/conversation type.
+var (
+	sidebarIconChannel  = fyne.NewStaticResource("sb-channel.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>`))
+	sidebarIconLock     = fyne.NewStaticResource("sb-lock.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`))
+	sidebarIconDM       = fyne.NewStaticResource("sb-dm.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`))
+	sidebarIconGroup    = fyne.NewStaticResource("sb-group.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`))
+	sidebarIconThread   = fyne.NewStaticResource("sb-thread.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>`))
+	sidebarIconSettings = fyne.NewStaticResource("sb-settings.svg", []byte(`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`))
+)
 
 // Preference keys for persistent UI state.
 const (
@@ -114,10 +124,16 @@ type App struct {
 	rootContent        *fyne.Container
 	statusLabel        *widget.Label
 	statusActionButton *widget.Button
-	statusActionLabel  string
-	statusActionFn     func()
-	showChatList       bool
-	showTimestamps     bool
+
+	// Chrome canvas refs updated on light/dark switch.
+	sidebarBg         *canvas.Rectangle
+	sidebarTitle      *canvas.Text
+	railBg            *canvas.Rectangle
+	settingsIcon      fyne.CanvasObject
+	statusActionLabel string
+	statusActionFn    func()
+	showChatList      bool
+	showTimestamps    bool
 
 	paneManager *paneManager
 
@@ -192,9 +208,10 @@ func (a *App) Run() {
 	a.fyneApp = app.NewWithID(appID)
 	a.appTheme = newCompactTheme()
 	a.loadUIState()
+	updatePaletteForMode(a.appTheme.dark)
 	a.fyneApp.Settings().SetTheme(a.appTheme)
 
-	a.win = a.fyneApp.NewWindow("Slack")
+	a.win = a.fyneApp.NewWindow("Design Spark")
 	a.win.Resize(fyne.NewSize(a.windowWidth, a.windowHeight))
 
 	a.buildSidebar()
@@ -225,19 +242,11 @@ func (a *App) Run() {
 	a.statusActionButton.Hide()
 	statusBarInner := container.NewBorder(nil, nil, a.statusLabel, a.statusActionButton, nil)
 	statusBar := container.NewPadded(statusBarInner)
-	// Top bar: team title + Cozy/Compact + theme toggle. The settings
-	// menu remains accessible via the rightmost icon.
-	settingsButton := widget.NewButtonWithIcon("", theme.MenuDropDownIcon(), func() {
-		a.openSettingsMenu()
-	})
-	settingsButton.Importance = widget.LowImportance
-	settingsWrap := container.NewGridWrap(fyne.NewSize(18, 18), settingsButton)
-	topBar := container.NewBorder(nil, nil, nil, container.NewPadded(settingsWrap), a.buildTopBar())
 
 	rail := a.buildWorkspaceRail()
 	body := container.NewBorder(nil, statusBar, a.chatListPane, nil, a.paneManager.widget())
 	mainArea := container.NewBorder(nil, nil, rail, nil, body)
-	a.rootContent = container.NewBorder(topBar, nil, nil, nil, mainArea)
+	a.rootContent = container.NewStack(mainArea)
 	a.win.SetContent(a.rootContent)
 
 	a.registerShortcuts()
@@ -278,32 +287,33 @@ func (a *App) Run() {
 
 func (a *App) buildSidebar() {
 	a.channelSearch = widget.NewEntry()
-	a.channelSearch.SetPlaceHolder("Search chats…")
+	a.channelSearch.SetPlaceHolder("Jump to or search...")
 	a.channelSearch.OnChanged = func(_ string) { a.scheduleSidebarFilterRebuild() }
 
 	a.channelList = widget.NewList(
 		func() int { return len(a.listItems) },
 		func() fyne.CanvasObject {
 			bg := canvas.NewRectangle(color.Transparent)
-			accent := canvas.NewRectangle(color.Transparent)
-			accent.SetMinSize(fyne.NewSize(3, 1))
-			lock := canvas.NewImageFromResource(privateChannelLockIcon)
-			lock.FillMode = canvas.ImageFillContain
-			lock.SetMinSize(fyne.NewSize(7, 7))
-			lock.Hide()
-			lockWrap := container.NewGridWrap(fyne.NewSize(7, 7), lock)
+			bg.CornerRadius = 6
+			icon := canvas.NewImageFromResource(sidebarIconChannel)
+			icon.FillMode = canvas.ImageFillContain
+			iconWrap := container.NewGridWrap(fyne.NewSize(12, 12), icon)
+			dot := canvas.NewText("", palette.ThreadAccent)
+			dot.TextSize = 7
+			dotWrap := container.NewGridWrap(fyne.NewSize(8, 14), container.NewCenter(dot))
 			lbl := widget.NewLabel("channel")
 			lbl.Wrapping = fyne.TextTruncate
 			fav := newGlyph("☆", nil)
 			fav.Hide()
-			favWrap := container.NewGridWrap(fyne.NewSize(12, 12), fav)
-			labelWrap := container.NewBorder(nil, nil, sidebarHSpacer(1), sidebarHSpacer(4), lbl)
-			content := container.NewBorder(nil, nil, container.NewHBox(accent, lockWrap), favWrap, labelWrap)
+			favWrap := container.NewGridWrap(fyne.NewSize(14, 14), fav)
+			left := container.NewHBox(fixedWidthSpacer(2), iconWrap, fixedWidthSpacer(4))
+			right := container.NewHBox(dotWrap, favWrap, fixedWidthSpacer(4))
+			content := container.NewBorder(nil, nil, left, right, lbl)
 			return newSidebarHoverRow(container.NewMax(bg, content), nil)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
-			bg, accent, lbl, fav, lock, hover := sidebarRowParts(obj)
-			if bg == nil || accent == nil || lbl == nil || fav == nil || lock == nil || hover == nil {
+			bg, icon, lbl, dot, fav, hover := sidebarRowParts(obj)
+			if bg == nil || icon == nil || lbl == nil || fav == nil || hover == nil {
 				return
 			}
 			if id < 0 || id >= len(a.listItems) {
@@ -312,30 +322,60 @@ func (a *App) buildSidebar() {
 			item := a.listItems[id]
 			hover.onHover = nil
 			fav.Hide()
-			lock.Hide()
 			bg.FillColor = color.Transparent
-			accent.FillColor = color.Transparent
+			icon.Resource = sidebarIconChannel
+			icon.Show()
+			if dot != nil {
+				dot.Text = ""
+			}
+
+			// Section headers
 			if item.channel == nil && item.thread == nil {
-				if strings.TrimSpace(item.sectionKey) == "" {
-					lbl.TextStyle = fyne.TextStyle{Bold: true}
-					lbl.SetText(strings.ToUpper(strings.TrimSpace(item.header)))
-				} else {
-					lbl.TextStyle = fyne.TextStyle{Bold: true}
-					lbl.SetText(a.sectionHeaderLabel(item.sectionKey, item.header, a.sectionItemCount(item.sectionKey)))
-				}
+				icon.Hide()
+				lbl.TextStyle = fyne.TextStyle{}
+				lbl.Importance = widget.LowImportance
+				lbl.SetText(strings.ToUpper(strings.TrimSpace(item.header)))
 				return
 			}
-			lbl.TextStyle = fyne.TextStyle{}
+			lbl.Importance = widget.MediumImportance
+
 			if item.channel != nil {
 				channelID := strings.TrimSpace(item.channel.ID)
 				isFav := a.isFavorite(channelID)
 				isPrivate := item.channel.IsPrivate && !item.channel.IsIM && !item.channel.IsMPIM
 				selected := strings.TrimSpace(a.selectedChannelID) == strings.TrimSpace(item.channel.ID) && strings.TrimSpace(a.selectedThreadTS) == ""
-				lbl.TextStyle = fyne.TextStyle{Bold: selected || a.channelHasUnread(*item.channel)}
-				prefix := ""
-				if selected {
-					bg.FillColor = theme.Color(theme.ColorNameHover)
+				hasUnread := a.channelHasUnread(*item.channel)
+
+				// Icon by type
+				switch {
+				case item.channel.IsIM:
+					icon.Resource = sidebarIconDM
+				case item.channel.IsMPIM:
+					icon.Resource = sidebarIconGroup
+				case isPrivate:
+					icon.Resource = sidebarIconLock
+				default:
+					icon.Resource = sidebarIconChannel
 				}
+				icon.Refresh()
+
+				lbl.TextStyle = fyne.TextStyle{Bold: hasUnread}
+				if selected {
+					bg.FillColor = palette.SidebarSelBG
+					lbl.Importance = widget.HighImportance
+				} else if a.sidebarHoverListID == id {
+					bg.FillColor = palette.SidebarHover
+				}
+
+				if dot != nil {
+					if hasUnread && !selected {
+						dot.Text = "●"
+					} else {
+						dot.Text = ""
+					}
+					dot.Refresh()
+				}
+
 				if isFav {
 					fav.text.Text = "★"
 					fav.text.Color = theme.Color(theme.ColorNamePrimary)
@@ -352,11 +392,6 @@ func (a *App) buildSidebar() {
 				} else {
 					fav.Hide()
 				}
-				if isPrivate && a.sidebarHoverListID == id {
-					lock.Show()
-				} else {
-					lock.Hide()
-				}
 				hover.onHover = func(in bool) {
 					if in {
 						if a.sidebarHoverListID != id {
@@ -371,16 +406,35 @@ func (a *App) buildSidebar() {
 					}
 				}
 				fav.Refresh()
-				lbl.SetText(prefix + a.chatListLabel(*item.channel))
+				lbl.SetText(a.chatBaseName(*item.channel))
 				return
 			}
+
+			// Thread rows
+			icon.Resource = sidebarIconThread
+			icon.Refresh()
 			selected := strings.TrimSpace(a.selectedThreadTS) == strings.TrimSpace(item.thread.ThreadTS) && strings.TrimSpace(a.selectedChannelID) == strings.TrimSpace(item.thread.ChannelID)
-			lbl.TextStyle = fyne.TextStyle{Italic: !selected, Bold: selected}
-			prefix := "↳ "
+			lbl.TextStyle = fyne.TextStyle{Bold: selected}
 			if selected {
-				bg.FillColor = theme.Color(theme.ColorNameHover)
+				bg.FillColor = palette.SidebarSelBG
+				lbl.Importance = widget.HighImportance
+			} else if a.sidebarHoverListID == id {
+				bg.FillColor = palette.SidebarHover
 			}
-			lbl.SetText(prefix + strings.TrimSpace(item.thread.Title))
+			hover.onHover = func(in bool) {
+				if in {
+					if a.sidebarHoverListID != id {
+						a.sidebarHoverListID = id
+						a.channelList.Refresh()
+					}
+					return
+				}
+				if a.sidebarHoverListID == id {
+					a.sidebarHoverListID = -1
+					a.channelList.Refresh()
+				}
+			}
+			lbl.SetText(strings.TrimSpace(item.thread.Title))
 		},
 	)
 	a.channelList.HideSeparators = true
@@ -416,17 +470,37 @@ func (a *App) buildSidebar() {
 		a.assignChannelToFocusedPane(item.channel.ID)
 	}
 
+	teamName := "Design Spark"
+	if a.info != nil && strings.TrimSpace(a.info.TeamName) != "" {
+		teamName = strings.TrimSpace(a.info.TeamName)
+	}
+	titleGlyph := newGlyph(teamName, func() { a.openSettingsMenu() })
+	titleGlyph.text.TextSize = 11
+	titleGlyph.text.TextStyle = fyne.TextStyle{Bold: true}
+	titleGlyph.text.Color = palette.MetaTextStrong
+	a.sidebarTitle = titleGlyph.text
+	settingsBtn := newGhostIcon(sidebarIconSettings, func() { a.openSettingsMenu() })
+	a.settingsIcon = settingsBtn
+	settingsWrap := container.NewGridWrap(fyne.NewSize(18, 18), settingsBtn)
+	header := container.NewBorder(nil, nil, titleGlyph, settingsWrap, nil)
+
 	left := container.NewBorder(
-		a.channelSearch,
-		nil, nil, nil,
+		container.NewVBox(header, fixedHeightSpacer(6), a.channelSearch),
+		nil,
+		nil, nil,
 		a.channelList,
 	)
-	a.chatListPane = newFixedWidthWrap(left, 106)
-	a.chatListPane.show = a.showChatList
+	bg := canvas.NewRectangle(palette.SidebarBG)
+	a.sidebarBg = bg
+	// Pad top/right/bottom but not left — list rows already have their own left inset.
+	inner := container.NewBorder(layoutSpacerH(4), layoutSpacerH(4), nil, fixedWidthSpacer(4), left)
+	a.chatListPane = newFixedWidthWrap(container.NewMax(bg, inner), 238)
+	if !a.showChatList {
+		a.chatListPane.setShown(false)
+	}
 }
 
-func sidebarRowParts(obj fyne.CanvasObject) (bg *canvas.Rectangle, accent *canvas.Rectangle, lbl *widget.Label, fav *glyph, lock *canvas.Image, hover *sidebarHoverRow) {
-	rects := make([]*canvas.Rectangle, 0, 2)
+func sidebarRowParts(obj fyne.CanvasObject) (bg *canvas.Rectangle, icon *canvas.Image, lbl *widget.Label, dot *canvas.Text, fav *glyph, hover *sidebarHoverRow) {
 	var walk func(fyne.CanvasObject)
 	walk = func(cur fyne.CanvasObject) {
 		if cur == nil {
@@ -434,10 +508,16 @@ func sidebarRowParts(obj fyne.CanvasObject) (bg *canvas.Rectangle, accent *canva
 		}
 		switch v := cur.(type) {
 		case *canvas.Rectangle:
-			rects = append(rects, v)
+			if bg == nil {
+				bg = v
+			}
 		case *canvas.Image:
-			if lock == nil {
-				lock = v
+			if icon == nil {
+				icon = v
+			}
+		case *canvas.Text:
+			if dot == nil {
+				dot = v
 			}
 		case *widget.Label:
 			if lbl == nil {
@@ -459,13 +539,7 @@ func sidebarRowParts(obj fyne.CanvasObject) (bg *canvas.Rectangle, accent *canva
 		}
 	}
 	walk(obj)
-	if len(rects) > 0 {
-		bg = rects[0]
-	}
-	if len(rects) > 1 {
-		accent = rects[1]
-	}
-	return bg, accent, lbl, fav, lock, hover
+	return
 }
 
 func sidebarHSpacer(width float32) fyne.CanvasObject {
@@ -798,41 +872,7 @@ func (a *App) updateChatListWidth() {
 	if a.chatListPane == nil {
 		return
 	}
-	const (
-		minWidth  = float32(92)
-		maxWidth  = float32(134)
-		charWidth = float32(6.0)
-		padding   = float32(28)
-	)
-	target := minWidth
-	for _, item := range a.listItems {
-		label := ""
-		switch {
-		case item.channel != nil:
-			label = a.chatListWidthLabel(*item.channel)
-		case item.thread != nil:
-			label = "↳ " + strings.TrimSpace(item.thread.Title)
-		default:
-			label = strings.TrimSpace(item.header)
-		}
-		if label == "" {
-			continue
-		}
-		runes := []rune(label)
-		if len(runes) > 30 {
-			runes = runes[:30]
-		}
-		w := float32(len(runes))*charWidth + padding
-		if w > target {
-			target = w
-		}
-	}
-	if target > maxWidth {
-		target = maxWidth
-	}
-	if target < minWidth {
-		target = minWidth
-	}
+	const target = float32(238)
 	if a.chatListPane.width == target {
 		return
 	}
@@ -1199,8 +1239,13 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 			msgs[i].MentionedMe = messageMentionsUser(msgs[i].Text, a.info.UserID) || messageMentionsUser(msgs[i].ForwardedText, a.info.UserID)
 			msgs[i].Text = a.formatMentionsForDisplay(msgs[i].Text)
 			msgs[i].ForwardedText = a.formatMentionsForDisplay(msgs[i].ForwardedText)
+			if msgs[i].AvatarURL == "" && msgs[i].UserID != "" {
+				if info, ok := a.userInfoByID[msgs[i].UserID]; ok {
+					msgs[i].AvatarURL = info.AvatarURL
+				}
+			}
 		}
-		p.setMessages(msgs, a.info.UserID, a.info.UserID, a.win, a.showTimestamps, func(m api.Message) {
+		p.setMessages(msgs, a.info.UserID, a.info.UserID, a.win, a.showTimestamps, a.appTheme.compactMode, func(m api.Message) {
 			a.openThreadInPane(p, m)
 		}, func(m api.Message) {
 			a.setReplyTarget(p, m)
@@ -2028,7 +2073,7 @@ func quickSwitchRowParts(obj fyne.CanvasObject) (dot *canvas.Text, title *widget
 }
 
 var mentionHandleRE = regexp.MustCompile(`(^|[\s(\[{])@([a-zA-Z0-9._-]{1,80})`)
-var mentionSlackIDRE = regexp.MustCompile(`<@([A-Z0-9]+)(?:\|[^>]+)?>`)
+var mentionSlackIDRE = regexp.MustCompile(`<@([A-Z0-9]+)(?:\|([^>]*))?>`)
 
 func (a *App) expandOutgoingMentions(text string) string {
 	if strings.TrimSpace(text) == "" {
@@ -2055,7 +2100,7 @@ func (a *App) formatMentionsForDisplay(text string) string {
 	}
 	return mentionSlackIDRE.ReplaceAllStringFunc(text, func(m string) string {
 		g := mentionSlackIDRE.FindStringSubmatch(m)
-		if len(g) != 2 {
+		if len(g) < 2 {
 			return m
 		}
 		id := strings.TrimSpace(g[1])
@@ -2068,7 +2113,13 @@ func (a *App) formatMentionsForDisplay(text string) string {
 		if name := strings.TrimSpace(a.users[id]); name != "" {
 			return "@" + name
 		}
-		return "@user"
+		// Fall back to the display name embedded in the token (|name part)
+		if len(g) > 2 {
+			if inline := strings.TrimSpace(g[2]); inline != "" {
+				return "@" + inline
+			}
+		}
+		return "@" + id
 	})
 }
 
@@ -2172,9 +2223,28 @@ func (a *App) buildSettingsMenu() *fyne.Menu {
 	fontItem.ChildMenu = fyne.NewMenu("", fontItems...)
 
 	windowMenu := fyne.NewMenu("Window",
+		fyne.NewMenuItem("Quick Switcher  ⌃K", func() { a.openQuickSwitcher() }),
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem("Split Right  ⌃H", func() {
+			p := a.newPane()
+			a.paneManager.splitFocused(splitHorizontal, p)
+			a.focusPaneInput(a.paneManager.focusedPane())
+			a.savePaneLayoutState()
+		}),
+		fyne.NewMenuItem("Split Down  ⌃J", func() {
+			p := a.newPane()
+			a.paneManager.splitFocused(splitVertical, p)
+			a.focusPaneInput(a.paneManager.focusedPane())
+			a.savePaneLayoutState()
+		}),
+		fyne.NewMenuItem("Close Pane  ⌃W", func() {
+			a.paneManager.closeFocused()
+			a.focusPaneInput(a.paneManager.focusedPane())
+			a.savePaneLayoutState()
+		}),
+		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("New Window", func() { a.openNewWindow() }),
-		fyne.NewMenuItem("Move Focused Pane to New Window", func() { a.moveFocusedPaneToNewWindow() }),
-		fyne.NewMenuItem("Quick Switcher", func() { a.openQuickSwitcher() }),
+		fyne.NewMenuItem("Move Pane to New Window", func() { a.moveFocusedPaneToNewWindow() }),
 		fyne.NewMenuItem(func() string {
 			if a.paneManager != nil {
 				if p := a.paneManager.focusedPane(); p != nil && a.isFavorite(p.channelID) {
@@ -2219,7 +2289,13 @@ func (a *App) openSettingsMenu() {
 		return
 	}
 	menu := a.buildSettingsMenu()
-	pos := fyne.NewPos(a.win.Canvas().Size().Width-6, 18)
+	var pos fyne.Position
+	if a.settingsIcon != nil {
+		abs := fyne.CurrentApp().Driver().AbsolutePositionForObject(a.settingsIcon)
+		pos = fyne.NewPos(abs.X, abs.Y+a.settingsIcon.Size().Height+2)
+	} else {
+		pos = fyne.NewPos(10, 30)
+	}
 	widget.ShowPopUpMenuAtPosition(menu, a.win.Canvas(), pos)
 }
 
@@ -2238,8 +2314,7 @@ func (a *App) syncSidebarSelectionToFocusedPane(p *chatPane) {
 
 func (a *App) toggleChatList() {
 	a.showChatList = !a.showChatList
-	a.chatListPane.show = a.showChatList
-	a.chatListPane.Refresh()
+	a.chatListPane.setShown(a.showChatList)
 	a.rootContent.Refresh()
 	a.fyneApp.Preferences().SetBool(prefShowChatList, a.showChatList)
 }
@@ -2263,9 +2338,32 @@ func (a *App) setCompactMode(enabled bool) {
 
 func (a *App) setDarkMode(enabled bool) {
 	a.appTheme.dark = enabled
+	updatePaletteForMode(enabled)
 	a.fyneApp.Preferences().SetBool(prefDarkMode, enabled)
 	a.fyneApp.Settings().SetTheme(a.appTheme)
+	a.refreshChromeForTheme()
 	a.refreshPanesForTheme()
+}
+
+// refreshChromeForTheme updates all custom-drawn chrome rectangles and texts
+// that were painted with palette colors at build time and don't re-read the
+// palette automatically.
+func (a *App) refreshChromeForTheme() {
+	if a.sidebarBg != nil {
+		a.sidebarBg.FillColor = palette.SidebarBG
+		a.sidebarBg.Refresh()
+	}
+	if a.sidebarTitle != nil {
+		a.sidebarTitle.Color = palette.MetaTextStrong
+		a.sidebarTitle.Refresh()
+	}
+	if a.railBg != nil {
+		a.railBg.FillColor = palette.RailBG
+		a.railBg.Refresh()
+	}
+	if a.channelList != nil {
+		a.channelList.Refresh()
+	}
 }
 
 func (a *App) setShowTimestamps(enabled bool) {
@@ -2409,7 +2507,7 @@ func (a *App) loadUIState() {
 	a.showChatList = prefs.BoolWithFallback(prefShowChatList, true)
 	a.showTimestamps = prefs.BoolWithFallback(prefShowTimestamps, false)
 	a.appTheme.dark = prefs.BoolWithFallback(prefDarkMode, a.appTheme.dark)
-	a.appTheme.compactMode = prefs.BoolWithFallback(prefCompactMode, false)
+	a.appTheme.compactMode = prefs.BoolWithFallback(prefCompactMode, true)
 	fontSize := prefs.IntWithFallback(prefFontSize, int(a.appTheme.fontSize))
 	fontSize = clampUIFontSize(fontSize)
 	a.appTheme.fontSize = float32(fontSize)
