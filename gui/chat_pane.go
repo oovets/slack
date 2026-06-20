@@ -96,22 +96,35 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 
 	p.inputTopGap = canvas.NewRectangle(color.Transparent)
 	p.inputTopGap.SetMinSize(fyne.NewSize(1, 8))
-	p.inputBg = canvas.NewRectangle(color.Transparent)
+	p.inputBg = canvas.NewRectangle(palette.ComposerBG)
+	p.inputBg.CornerRadius = 10
 	p.inputBorder = canvas.NewRectangle(color.Transparent)
-	p.inputBorder.StrokeColor = color.Transparent
-	p.inputBorder.StrokeWidth = 0
-	inputHPad := float32(8)
-	inputVPad := float32(3)
+	p.inputBorder.StrokeColor = palette.ComposerBorder
+	p.inputBorder.StrokeWidth = 1
+	p.inputBorder.CornerRadius = 10
+	inputHPad := float32(10)
+	inputVPad := float32(6)
 	inputTopPad := canvas.NewRectangle(color.Transparent)
 	inputTopPad.SetMinSize(fyne.NewSize(1, inputVPad))
 	inputBottomPad := canvas.NewRectangle(color.Transparent)
 	inputBottomPad.SetMinSize(fyne.NewSize(1, inputVPad))
-	entryRow := container.NewMax(
-		p.inputBorder,
-		p.inputBg,
-		container.NewBorder(inputTopPad, inputBottomPad, fixedWidthSpacer(inputHPad), fixedWidthSpacer(inputHPad), p.input),
+
+	sendBtn := newPrimarySendButton(func() {
+		if onSend != nil {
+			onSend(p)
+		}
+	})
+	rightCol := container.NewVBox(layoutSpacerH(2), sendBtn)
+
+	inner := container.NewBorder(
+		inputTopPad, inputBottomPad,
+		fixedWidthSpacer(inputHPad),
+		container.NewHBox(fixedWidthSpacer(6), rightCol, fixedWidthSpacer(inputHPad)),
+		p.input,
 	)
-	p.inputCard = container.NewVBox(p.inputTopGap, p.threadHolder, p.replyHolder, entryRow)
+	entryRow := container.NewStack(p.inputBg, p.inputBorder, inner)
+	p.inputCard = container.NewVBox(p.inputTopGap, p.threadHolder, p.replyHolder, container.NewPadded(entryRow))
+
 	p.inputVisible = true
 	p.viewport = container.NewBorder(nil, p.inputCard, nil, nil, p.msgScroll)
 	p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.inputCard}
@@ -184,14 +197,15 @@ func (p *chatPane) clearMessages() {
 
 func (p *chatPane) refreshForTheme() {
 	if p.inputBg != nil {
-		p.inputBg.FillColor = color.Transparent
+		p.inputBg.FillColor = palette.ComposerBG
 		p.inputBg.Refresh()
 	}
 	if p.inputBorder != nil {
-		p.inputBorder.StrokeColor = color.Transparent
-		p.inputBorder.StrokeWidth = 0
+		p.inputBorder.StrokeColor = palette.ComposerBorder
+		p.inputBorder.StrokeWidth = 1
 		p.inputBorder.Refresh()
 	}
+
 	if p.threadBg != nil {
 		p.threadBg.FillColor = theme.Color(theme.ColorNameHover)
 		p.threadBg.Refresh()
