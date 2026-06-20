@@ -10,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/stefan/slack-gui/api"
+	"github.com/oovets/slack/api"
 )
 
 // paneIDCounter assigns unique IDs to chat panes. All pane creation happens on
@@ -138,22 +138,14 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 	composer := container.NewVBox(formatBar, entryRow)
 	p.inputCard = container.NewVBox(p.inputTopGap, p.threadHolder, p.replyHolder, container.NewPadded(composer))
 
-	// Channel header bar (purple "#"-tile + name + topic) painted at top.
+	// Channel header bar (name + topic) painted at top.
 	p.headerTitle = canvas.NewText("Select a channel", palette.MetaTextStrong)
 	p.headerTitle.TextStyle = fyne.TextStyle{Bold: true}
 	p.headerTitle.TextSize = 12
 	p.headerSub = canvas.NewText("", palette.SectionLabel)
 	p.headerSub.TextSize = 10
-	tileBg := canvas.NewRectangle(palette.ChannelTileBG)
-	tileBg.CornerRadius = 7
-	tileBg.SetMinSize(fyne.NewSize(24, 24))
-	hash := canvas.NewText("#", palette.ChannelTileFG)
-	hash.TextStyle = fyne.TextStyle{Bold: true}
-	hash.TextSize = 12
-	hash.Alignment = fyne.TextAlignCenter
-	tile := container.NewStack(tileBg, container.NewCenter(hash))
 	headerLeft := container.NewHBox(
-		fixedWidthSpacer(12), tile, fixedWidthSpacer(8),
+		fixedWidthSpacer(12),
 		container.NewVBox(p.headerTitle, p.headerSub),
 	)
 	headerRow := container.NewBorder(nil, nil, headerLeft, fixedWidthSpacer(12), nil)

@@ -8,7 +8,7 @@ maintainer: Stefan <stefan@users.noreply.github.com>
 description: |
   Lightweight Slack desktop client built with Go and Fyne.
 vendor: slack-gui
-homepage: https://github.com/stefan/slack-gui
+homepage: https://github.com/oovets/slack
 license: MIT
 contents:
   - src: ./dist/slack-gui
@@ -25,4 +25,4 @@ rpm:
   summary: Lightweight Slack desktop client
 deb:
   fields:
-    Bugs: https://github.com/stefan/slack-gui/issues
+    Bugs: https://github.com/oovets/slack/issues

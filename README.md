@@ -55,8 +55,8 @@ Credential priority:
 Optional environment variables:
 
 ```bash
-export SLACK_BOT_TOKEN="xoxb-..."
-export SLACK_APP_TOKEN="xapp-..." # optional, enables Socket Mode
+export SLACK_BOT_TOKEN="replace-with-slack-bot-token"
+export SLACK_APP_TOKEN="replace-with-slack-app-token" # optional, enables Socket Mode
 export SLACK_API_BASE_URL="https://slack.com/api" # optional
 export SLACK_CONFIG_PATH="/path/to/.slack_config.json" # optional override
 ```
@@ -93,14 +93,6 @@ go fmt ./...
 go vet ./...
 go test ./...
 go build -o dist/slack-gui ./cmd/slack-gui
-```
-
-The tracked `package.json` exists for preview tooling and simply forwards
-useful scripts to Go:
-
-```bash
-npm run test
-npm run build
 ```
 
 ## Release Checklist

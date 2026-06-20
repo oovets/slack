@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"hash/fnv"
+	"html"
 	"image"
 	"image/color"
 	"io"
@@ -19,7 +20,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
-	"github.com/stefan/slack-gui/api"
+	"github.com/oovets/slack/api"
 )
 
 var (
@@ -711,15 +712,22 @@ func shouldUseSlackAuth(rawURL string) bool {
 }
 
 func renderSlackText(raw string) string {
+	text := normalizeSlackDisplayText(raw)
+	if text == "" {
+		return ""
+	}
+	text = convertSlackLinks(text)
+	return convertSlackEmojiShortcodes(text)
+}
+
+func normalizeSlackDisplayText(raw string) string {
 	text := strings.TrimSpace(raw)
 	if text == "" {
 		return ""
 	}
-	text = strings.ReplaceAll(text, "&amp;", "&")
-	text = strings.ReplaceAll(text, "&lt;", "<")
-	text = strings.ReplaceAll(text, "&gt;", ">")
-	text = convertSlackLinks(text)
-	return convertSlackEmojiShortcodes(text)
+	text = html.UnescapeString(text)
+	text = strings.ReplaceAll(text, "\u00a0", " ")
+	return text
 }
 
 func convertSlackLinks(text string) string {
@@ -743,8 +751,7 @@ func convertSlackLinks(text string) string {
 		token := text[i+1 : end]
 		switch {
 		case strings.HasPrefix(token, "!"):
-			special := strings.SplitN(strings.TrimPrefix(token, "!"), "|", 2)[0]
-			out.WriteString("@" + special)
+			out.WriteString(displaySlackSpecialToken(strings.TrimPrefix(token, "!")))
 		case strings.Contains(token, "|"):
 			parts := strings.SplitN(token, "|", 2)
 			label := strings.TrimSpace(parts[1])
@@ -767,6 +774,36 @@ func convertSlackLinks(text string) string {
 		i = end + 1
 	}
 	return out.String()
+}
+
+func displaySlackSpecialToken(token string) string {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return ""
+	}
+	parts := strings.SplitN(token, "|", 2)
+	if len(parts) == 2 {
+		if label := strings.TrimSpace(parts[1]); label != "" {
+			return label
+		}
+	}
+	key := strings.TrimSpace(parts[0])
+	if cut, _, ok := strings.Cut(key, "^"); ok {
+		key = cut
+	}
+	key = strings.TrimSpace(key)
+	switch key {
+	case "here", "channel", "everyone":
+		return "@" + key
+	case "date":
+		return ""
+	case "subteam":
+		return "@subteam"
+	}
+	if key == "" {
+		return ""
+	}
+	return "@" + key
 }
 
 func formatReactionToken(name string) string {

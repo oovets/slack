@@ -13,7 +13,7 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/stefan/slack-gui/api"
+	"github.com/oovets/slack/api"
 )
 
 // ===== Reaction chips =====================================================

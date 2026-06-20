@@ -27,7 +27,7 @@ import (
 
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/stefan/slack-gui/api"
+	"github.com/oovets/slack/api"
 )
 
 const appID = "com.bluebubbles-tui.slackgui"

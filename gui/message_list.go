@@ -6,7 +6,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"github.com/stefan/slack-gui/api"
+	"github.com/oovets/slack/api"
 )
 
 // trimEq reports whether a and b are equal after trimming, and non-empty.

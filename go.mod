@@ -1,4 +1,4 @@
-module github.com/stefan/slack-gui
+module github.com/oovets/slack
 
 go 1.24.2
 

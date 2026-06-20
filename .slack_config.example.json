@@ -3,8 +3,8 @@
   "workspaces": [
     {
       "name": "Example Workspace",
-      "token": "xoxb-your-token",
-      "app_token": "xapp-your-app-token"
+      "token": "replace-with-slack-bot-token",
+      "app_token": "replace-with-slack-app-token"
     }
   ]
 }

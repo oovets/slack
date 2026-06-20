@@ -113,13 +113,10 @@ func inlineBodyTextSize() float32 {
 // substitution — we keep shortcodes intact so the tokenizer can convert them
 // into image segments later.
 func renderSlackTextNoEmoji(raw string) string {
-	text := strings.TrimSpace(raw)
+	text := normalizeSlackDisplayText(raw)
 	if text == "" {
 		return ""
 	}
-	text = strings.ReplaceAll(text, "&amp;", "&")
-	text = strings.ReplaceAll(text, "&lt;", "<")
-	text = strings.ReplaceAll(text, "&gt;", ">")
 	return convertSlackLinks(text)
 }
 

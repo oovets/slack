@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/stefan/slack-gui/api"
-	"github.com/stefan/slack-gui/gui"
+	"github.com/oovets/slack/api"
+	"github.com/oovets/slack/gui"
 )
 
 func init() {

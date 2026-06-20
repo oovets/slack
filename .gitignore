@@ -2,7 +2,7 @@
 bin/
 coverage.out
 *.test
-slack-gui
+/slack-gui
 
 # Release artifacts
 build/
@@ -22,22 +22,6 @@ checksums_*.txt
 .slack_config.json
 *.log
 
-# JS tooling used by hosted preview harnesses
-node_modules/
-.next/
-out/
-
-# JS package manager logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-bun-debug.log*
-
 # OS/editor
 .DS_Store
 *.swp
-
-# TypeScript / Next.js generated files
-*.tsbuildinfo
-next-env.d.ts
