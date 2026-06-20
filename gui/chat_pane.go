@@ -44,6 +44,10 @@ type chatPane struct {
 	inputBorder *canvas.Rectangle
 	threadBg    *canvas.Rectangle
 	replyBg     *canvas.Rectangle
+
+	header      *fyne.Container
+	headerTitle *canvas.Text
+	headerSub   *canvas.Text
 }
 
 func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThread func(*chatPane), onCancelReply func(*chatPane), onResized func(*chatPane), onShortcut func(fyne.Shortcut) bool) *chatPane {
