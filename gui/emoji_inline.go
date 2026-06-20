@@ -304,38 +304,77 @@ func (r *wrapBoxRenderer) Layout(size fyne.Size) {
 }
 
 // layoutWith places children if `apply` is true, otherwise just measures.
+// Two-pass per line: collect items into lines first, then vertically
+// center each item against the tallest sibling in its line so text
+// baselines and emoji glyphs sit on the same optical line.
 func (r *wrapBoxRenderer) layoutWith(width float32, apply bool) float32 {
 	if width <= 0 {
-		width = 480 // safe fallback before we have a real container width
+		width = 480
 	}
-	x, y, lineH := float32(0), float32(0), float32(0)
+	type item struct {
+		obj  fyne.CanvasObject
+		size fyne.Size
+		hard bool
+	}
+	var lines [][]item
+	var cur []item
+	x := float32(0)
 	for _, o := range r.box.objs {
-		// Hard break on "\n" tokens.
 		if t, ok := o.(*canvas.Text); ok && t.Text == "\n" {
-			if apply {
-				o.Resize(fyne.NewSize(0, 0))
-			}
-			y += lineH + r.box.lineGap
+			cur = append(cur, item{obj: o, hard: true})
+			lines = append(lines, cur)
+			cur = nil
 			x = 0
-			lineH = 0
 			continue
 		}
 		s := o.MinSize()
 		if x > 0 && x+s.Width > width {
-			y += lineH + r.box.lineGap
+			lines = append(lines, cur)
+			cur = nil
 			x = 0
-			lineH = 0
 		}
-		if apply {
-			o.Move(fyne.NewPos(x, y))
-			o.Resize(s)
-		}
+		cur = append(cur, item{obj: o, size: s})
 		x += s.Width + r.box.hGap
-		if s.Height > lineH {
-			lineH = s.Height
+	}
+	if cur != nil {
+		lines = append(lines, cur)
+	}
+
+	y := float32(0)
+	for li, line := range lines {
+		var maxH float32
+		for _, it := range line {
+			if it.hard {
+				continue
+			}
+			if it.size.Height > maxH {
+				maxH = it.size.Height
+			}
+		}
+		if maxH == 0 {
+			maxH = inlineBodyTextSize() + 2
+		}
+		xx := float32(0)
+		for _, it := range line {
+			if it.hard {
+				if apply {
+					it.obj.Resize(fyne.NewSize(0, 0))
+				}
+				continue
+			}
+			cy := y + (maxH-it.size.Height)/2
+			if apply {
+				it.obj.Move(fyne.NewPos(xx, cy))
+				it.obj.Resize(it.size)
+			}
+			xx += it.size.Width + r.box.hGap
+		}
+		y += maxH
+		if li < len(lines)-1 {
+			y += r.box.lineGap
 		}
 	}
-	return y + lineH
+	return y
 }
 
 func (r *wrapBoxRenderer) MinSize() fyne.Size {

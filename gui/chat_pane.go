@@ -234,7 +234,10 @@ func (p *chatPane) setMessages(msgs []api.Message, currentUserID, selfUserID str
 	})
 	if len(msgs) > 0 {
 		p.scrollToBottomSoon()
+	}
 }
+
+
 
 // applyLocalReactions updates the rendered chips for one message in this
 // pane without triggering a full history reload. Returns false if the
@@ -252,4 +255,4 @@ func (p *chatPane) messageByTS(ts string) (api.Message, bool) {
 	}
 	return p.msgList.messageByTS(ts)
 }
-}
+

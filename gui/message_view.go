@@ -17,6 +17,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 	"github.com/stefan/slack-gui/api"
@@ -65,11 +66,10 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 		onThread(m)
 	}
 	if !inThreadView && m.ReplyCount > 0 {
-		threadLabel := fmt.Sprintf("%d repl%s · View thread", m.ReplyCount, pluralSuffix(m.ReplyCount))
-		rowWithMeta.Add(alignOutgoingRow(newSubtleTapLabel(threadLabel, openThread), isFromMe))
+		rowWithMeta.Add(alignOutgoingRow(newThreadReplyBar(m.ReplyCount, openThread), isFromMe))
 	}
-	if onReply != nil {
-		rowWithMeta.Add(alignOutgoingRow(newSubtleTapLabel("Reply", func() {
+	if onReply != nil && (inThreadView || m.ReplyCount == 0) {
+		rowWithMeta.Add(alignOutgoingRow(newSubtleTapLabel("Reply in thread", func() {
 			onReply(m)
 		}), isFromMe))
 	}
@@ -166,19 +166,89 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 	if !showTimestamps {
 		rowCanvas = newTimestampToggleRow(rowCanvas, formatHoverTimestamp(m.Time), isFromMe)
 	}
+	// Add a small breath of space above the first message in a sender group
+	// (Slack-native: sender clusters get ~8px of vertical separation).
+	if showHeader {
+		rowCanvas = container.NewVBox(fixedHeightSpacer(8), rowCanvas)
+	}
 	if !isFromMe && mentionedMe {
-		bg := canvas.NewRectangle(color.NRGBA{R: 66, G: 53, B: 24, A: 120})
+		bg := canvas.NewRectangle(palette.MentionRowBG)
 		return container.NewMax(bg, rowCanvas)
 	}
 	return rowCanvas
 }
 
-func pluralSuffix(n int) string {
-	if n == 1 {
-		return "y"
-	}
-	return "ies"
+// fixedHeightSpacer is a vertical spacer used to add breathing room
+// between sender groups without inflating min-width.
+func fixedHeightSpacer(height float32) fyne.CanvasObject {
+	r := canvas.NewRectangle(color.Transparent)
+	r.SetMinSize(fyne.NewSize(1, height))
+	return r
 }
+
+// newThreadReplyBar renders a Slack-style "N replies · View thread" chip:
+// rounded background that lights up on hover, accent-colored label, and a
+// muted reply count. Tapping opens the thread view.
+func newThreadReplyBar(count int, onTap func()) fyne.CanvasObject {
+	bg := canvas.NewRectangle(color.Transparent)
+	bg.CornerRadius = 8
+	bg.StrokeColor = color.Transparent
+	bg.StrokeWidth = 1
+
+	countText := canvas.NewText(fmt.Sprintf("%d %s", count, pluralizeReplies(count)), palette.ThreadAccent)
+	countText.TextSize = messageMetaActionTextSize()
+	countText.TextStyle = fyne.TextStyle{Bold: true}
+
+	dot := canvas.NewText("·", palette.MetaText)
+	dot.TextSize = messageMetaActionTextSize()
+
+	view := canvas.NewText("View thread", palette.MetaText)
+	view.TextSize = messageMetaActionTextSize()
+
+	inner := container.NewHBox(fixedWidthSpacer(2), countText, dot, view, fixedWidthSpacer(2))
+	stack := container.NewStack(bg, container.NewPadded(inner))
+
+	bar := &threadReplyBar{bg: bg, content: stack, onTap: onTap}
+	bar.ExtendBaseWidget(bar)
+	return bar
+}
+
+func pluralizeReplies(n int) string {
+	if n == 1 {
+		return "reply"
+	}
+	return "replies"
+}
+
+// threadReplyBar is the hoverable Slack-style "N replies · View thread"
+// pill used inline beneath messages with a thread.
+type threadReplyBar struct {
+	widget.BaseWidget
+	bg      *canvas.Rectangle
+	content fyne.CanvasObject
+	onTap   func()
+}
+
+func (b *threadReplyBar) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(b.content)
+}
+func (b *threadReplyBar) Tapped(_ *fyne.PointEvent)          { if b.onTap != nil { b.onTap() } }
+func (b *threadReplyBar) TappedSecondary(_ *fyne.PointEvent) {}
+func (b *threadReplyBar) MouseIn(_ *desktop.MouseEvent) {
+	b.bg.FillColor = palette.ThreadHoverBG
+	b.bg.StrokeColor = palette.ChipBorder
+	b.bg.Refresh()
+}
+func (b *threadReplyBar) MouseOut() {
+	b.bg.FillColor = color.Transparent
+	b.bg.StrokeColor = color.Transparent
+	b.bg.Refresh()
+}
+func (b *threadReplyBar) MouseMoved(_ *desktop.MouseEvent) {}
+func (b *threadReplyBar) Cursor() desktop.Cursor            { return desktop.PointerCursor }
+
+
+
 
 func senderName(m api.Message) string {
 	if s := strings.TrimSpace(m.Username); s != "" {
