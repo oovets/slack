@@ -1398,9 +1398,9 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 			msgs[i].ForwardedText = a.formatMentionsForDisplay(msgs[i].ForwardedText)
 			if msgs[i].UserID != "" {
 				if info, ok := a.userInfoByID[msgs[i].UserID]; ok {
-					if msgs[i].BotID == "" {
-						// Real user: always prefer profile directory avatar —
-						// the embedded message avatar may be the Slack app icon.
+					if !info.IsBot && !info.IsAppUser {
+						// Real human: always prefer profile directory avatar—
+						// the embedded avatar may be the app icon when sent via bot token.
 						if strings.TrimSpace(info.AvatarURL) != "" {
 							msgs[i].AvatarURL = info.AvatarURL
 						}
@@ -1553,22 +1553,67 @@ func (a *App) openThreadInPane(p *chatPane, m api.Message) {
 	if p == nil || rootTS == "" {
 		return
 	}
-	p.threadTS = rootTS
+
+	// If the source pane is already a thread view, replace its content in-place.
+	if strings.TrimSpace(p.threadTS) != "" {
+		p.threadTS = rootTS
+		a.setSelectedSidebarThread(p.channelID, rootTS)
+		p.replyTarget = nil
+		p.replyHolder.Hide()
+		p.setThreadBanner(fmt.Sprintf("Thread: %s — %s", senderName(m), truncate(strings.TrimSpace(m.Text), 80)))
+		p.setTitle(fmt.Sprintf("#%s — thread", p.channelName))
+		p.setLoadingMessages()
+		a.schedulePaneScrollToBottom(p)
+		a.savePaneLayoutState()
+		go a.loadMessagesForPane(p)
+		return
+	}
+
+	// Channel pane: open the thread in a new pane to the right at 30% width.
+	// Reuse any existing thread pane rather than stacking new ones.
+	var tp *chatPane
+	for _, pane := range a.paneManager.allPanes() {
+		if strings.TrimSpace(pane.threadTS) != "" {
+			tp = pane
+			break
+		}
+	}
+	if tp == nil {
+		tp = a.newPane()
+		a.paneManager.splitAt(p, splitHorizontal, tp, 0.7)
+	} else {
+		a.paneManager.setFocus(tp)
+	}
+
+	ch := a.channelByID[p.channelID]
+	tp.channelID = p.channelID
+	tp.channelName = p.channelName
+	tp.threadTS = rootTS
+	tp.replyTarget = nil
+	tp.replyHolder.Hide()
+	tp.setThreadBanner(fmt.Sprintf("Thread: %s — %s", senderName(m), truncate(strings.TrimSpace(m.Text), 80)))
+	tp.input.SetPlaceHolder(a.chatInputPlaceholder(ch))
+	tp.setTitle(fmt.Sprintf("#%s — thread", p.channelName))
+	tp.setLoadingMessages()
 	a.setSelectedSidebarThread(p.channelID, rootTS)
-	p.replyTarget = nil
-	p.replyHolder.Hide()
-	p.setThreadBanner(fmt.Sprintf("Thread: %s — %s", senderName(m), truncate(strings.TrimSpace(m.Text), 80)))
-	p.setTitle(fmt.Sprintf("#%s — thread", p.channelName))
-	p.setLoadingMessages()
-	a.schedulePaneScrollToBottom(p)
+	a.schedulePaneScrollToBottom(tp)
 	a.savePaneLayoutState()
-	go a.loadMessagesForPane(p)
+	go a.loadMessagesForPane(tp)
 }
 
 func (a *App) exitThreadInPane(p *chatPane) {
 	if p == nil || strings.TrimSpace(p.threadTS) == "" {
 		return
 	}
+	// Thread panes are now separate panes: close them when the user exits.
+	if len(a.paneManager.allPanes()) > 1 {
+		channelID := p.channelID
+		a.paneManager.closePane(p)
+		a.setSelectedSidebarChannel(channelID)
+		a.savePaneLayoutState()
+		return
+	}
+	// Last remaining pane: revert to channel view instead of closing.
 	p.threadTS = ""
 	a.setSelectedSidebarChannel(p.channelID)
 	p.setThreadBanner("")
@@ -2516,56 +2561,91 @@ func (a *App) lazyResolveUserID(id string) {
 	}()
 }
 
-// mentionMatches returns autocomplete candidates whose handle or display name
-// starts with prefix (case-insensitive). Capped at 7 results.
-func (a *App) mentionMatches(prefix string) []completionMatch {
+// mentionMatchesInPane returns autocomplete candidates whose handle or display
+// name starts with prefix (case-insensitive), capped at 7 results.
+// Users who appear in the pane's currently-loaded messages are listed first.
+func (a *App) mentionMatchesInPane(prefix string, p *chatPane) []completionMatch {
 	q := strings.ToLower(prefix)
-	out := make([]completionMatch, 0, 8)
 	seen := map[string]bool{}
 
+	// Build set of users active in the current channel from loaded messages.
+	channelUsers := map[string]bool{}
+	if p != nil && p.msgList != nil {
+		for _, m := range p.msgList.msgs {
+			if id := strings.TrimSpace(m.UserID); id != "" {
+				channelUsers[id] = true
+			}
+		}
+	}
+
+	matchesHandle := func(handle string) bool {
+		return q == "" || strings.HasPrefix(handle, q)
+	}
+	matchesName := func(name string) bool {
+		if q == "" {
+			return true
+		}
+		lower := strings.ToLower(name)
+		if strings.HasPrefix(lower, q) {
+			return true
+		}
+		for _, word := range strings.Fields(lower) {
+			if strings.HasPrefix(word, q) {
+				return true
+			}
+		}
+		return false
+	}
+	makeMatch := func(handle, id, display string) completionMatch {
+		label := "@" + handle
+		if display != "" {
+			label = "@" + handle + "  —  " + display
+		}
+		return completionMatch{label: label, handle: handle}
+	}
+
+	var inChannel, others []completionMatch
+
 	for handle, id := range a.userByHandle {
-		if q != "" && !strings.HasPrefix(handle, q) {
+		if !matchesHandle(handle) {
 			continue
 		}
 		if seen[id] {
 			continue
 		}
 		seen[id] = true
-		display := strings.TrimSpace(a.users[id])
-		label := "@" + handle
-		if display != "" {
-			label = "@" + handle + "  —  " + display
+		m := makeMatch(handle, id, strings.TrimSpace(a.users[id]))
+		if channelUsers[id] {
+			inChannel = append(inChannel, m)
+		} else {
+			others = append(others, m)
 		}
-		out = append(out, completionMatch{label: label, handle: handle})
 	}
-	// Also match by display name — either full-name prefix or any word prefix.
+	// Also match by display name.
 	for id, name := range a.userByID {
 		if seen[id] {
 			continue
 		}
-		if q != "" {
-			lower := strings.ToLower(name)
-			matched := strings.HasPrefix(lower, q)
-			if !matched {
-				for _, word := range strings.Fields(lower) {
-					if strings.HasPrefix(word, q) {
-						matched = true
-						break
-					}
-				}
-			}
-			if !matched {
-				continue
-			}
+		if !matchesName(name) {
+			continue
 		}
 		handle := a.userHandleByID[id]
 		if handle == "" {
 			continue
 		}
 		seen[id] = true
-		out = append(out, completionMatch{label: "@" + handle + "  —  " + name, handle: handle})
+		m := makeMatch(handle, id, name)
+		if channelUsers[id] {
+			inChannel = append(inChannel, m)
+		} else {
+			others = append(others, m)
+		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].handle < out[j].handle })
+
+	sort.Slice(inChannel, func(i, j int) bool { return inChannel[i].handle < inChannel[j].handle })
+	sort.Slice(others, func(i, j int) bool { return others[i].handle < others[j].handle })
+
+	out := append(inChannel, others...)
 	if len(out) > 7 {
 		out = out[:7]
 	}
@@ -2574,7 +2654,9 @@ func (a *App) mentionMatches(prefix string) []completionMatch {
 
 // initPaneMention wires up the @mention autocompleter for a newly created pane.
 func (a *App) initPaneMention(p *chatPane) {
-	p.mentionFn = a.mentionMatches
+	p.mentionFn = func(prefix string) []completionMatch {
+		return a.mentionMatchesInPane(prefix, p)
+	}
 	p.completer = newMentionCompleter(a.win.Canvas(), p.input, func(handle string) {
 		applyMentionCompletion(p.input, handle)
 	})

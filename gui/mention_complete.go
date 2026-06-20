@@ -21,16 +21,18 @@ type completionMatch struct {
 // detects an @prefix. The popup uses plain tappable rows (not widget.List) to
 // avoid Fyne's internal focus management.
 //
-// Fyne's PopUp runs in its own overlay focus context, which means keyboard
-// events are routed to the overlay's focus manager rather than the main canvas.
-// To keep the composer entry receiving keystrokes we:
-//  1. Reuse a single PopUp and swap its Content in-place (avoids the
-//     hide→show cycle that triggers extra focus-context switches).
-//  2. Call cvs.Focus(entry) after each show so the entry is registered as the
-//     focused widget inside the overlay's focus context.
+// Fyne's PopUp adds its own focus manager to the overlay stack, which means
+// canvas.Focused() returns nil while the popup is visible (the entry is not in
+// the popup's widget tree). To keep the composer entry receiving keystrokes we:
+//  1. Reuse a single PopUp and swap its Content in-place (avoids extra overlay
+//     focus-context switches on each update).
+//  2. Wire canvas.SetOnTypedRune / SetOnTypedKey while the popup is visible.
+//     The glfw driver falls through to these handlers when canvas.Focused()==nil,
+//     so typed runes and navigation keys are forwarded directly to the entry.
+//  3. Clear those handlers in hide() so normal focus routing resumes.
 type mentionCompleter struct {
 	popup     *widget.PopUp
-	entry     fyne.Focusable
+	entry     *focusEntry
 	items     []completionMatch
 	selected  int
 	rowBGs    []*canvas.Rectangle
@@ -39,7 +41,7 @@ type mentionCompleter struct {
 	cvs       fyne.Canvas
 }
 
-func newMentionCompleter(cvs fyne.Canvas, entry fyne.Focusable, onPick func(handle string)) *mentionCompleter {
+func newMentionCompleter(cvs fyne.Canvas, entry *focusEntry, onPick func(handle string)) *mentionCompleter {
 	return &mentionCompleter{cvs: cvs, entry: entry, onPick: onPick}
 }
 
@@ -108,21 +110,24 @@ func (mc *mentionCompleter) update(matches []completionMatch, anchor fyne.Canvas
 		pos.Y = abs.Y + anchor.Size().Height + 6
 	}
 
-	if mc.popup == nil {
-		// First show: create the popup.
-		mc.popup = widget.NewPopUp(content, mc.cvs)
-	} else {
-		// Subsequent updates: swap content in-place to avoid the Hide→Show
-		// cycle that would trigger an extra overlay focus-context switch.
-		mc.popup.Content = content
-		mc.popup.Refresh()
+	// Recreate the popup each update so the renderer's object list always
+	// reflects the new rows. Swapping popup.Content in-place doesn't work
+	// because the renderer caches the original objects at creation time.
+	if mc.popup != nil {
+		mc.popup.Hide()
 	}
+	mc.popup = widget.NewPopUp(content, mc.cvs)
 	mc.popup.ShowAtPosition(pos)
 
-	// Fyne routes keyboard events to the overlay's focus manager when a PopUp
-	// is visible. Re-focus the composer entry inside that context so keystrokes
-	// keep reaching it while the completer is open.
+	// Fyne's overlay focus manager does not contain the entry, so
+	// canvas.Focused() returns nil while the popup is shown. The glfw driver
+	// falls back to canvas.OnTypedRune/OnTypedKey when Focused()==nil, so we
+	// wire those handlers to forward every keystroke to the entry directly.
+	// This also keeps visual focus on the entry (cursor blinking etc.).
 	if mc.entry != nil {
+		entry := mc.entry
+		mc.cvs.SetOnTypedRune(func(r rune) { entry.TypedRune(r) })
+		mc.cvs.SetOnTypedKey(func(k *fyne.KeyEvent) { entry.TypedKey(k) })
 		mc.cvs.Focus(mc.entry)
 	}
 }
@@ -131,6 +136,8 @@ func (mc *mentionCompleter) hide() {
 	if mc.popup != nil {
 		mc.popup.Hide()
 	}
+	mc.cvs.SetOnTypedRune(nil)
+	mc.cvs.SetOnTypedKey(nil)
 	mc.items = nil
 	mc.rowBGs = nil
 	mc.rowLabels = nil
@@ -209,7 +216,7 @@ func mentionPrefixAt(text string, row, col int) (prefix string, found bool) {
 }
 
 func isMentionHandleChar(r rune) bool {
-	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '_' || r == '-' || r == ' '
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '_' || r == '-'
 }
 
 // applyMentionCompletion replaces the @prefix before the cursor with @handle+space.
@@ -239,5 +246,9 @@ func applyMentionCompletion(entry *focusEntry, handle string) {
 		return
 	}
 	lines[row] = string(runes[:atPos+1]) + handle + " " + string(runes[col:])
+	// Set cursor to after "@handle " before SetText so that updateCursorAndSelection
+	// keeps it there (it only clamps, never moves forward).
+	entry.CursorRow = row
+	entry.CursorColumn = atPos + len([]rune(handle)) + 2
 	entry.SetText(strings.Join(lines, "\n"))
 }

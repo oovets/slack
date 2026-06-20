@@ -170,6 +170,41 @@ func (pm *paneManager) splitFocusedAt(dir splitDir, newPane *chatPane, offset fl
 	pm.rebuild()
 }
 
+func (pm *paneManager) splitAt(target *chatPane, dir splitDir, newPane *chatPane, offset float64) {
+	if target == nil || len(pm.allPanes()) >= pm.maxPanes || newPane == nil {
+		return
+	}
+	pm.root.split(target, newPane, dir, offset)
+	pm.setFocus(newPane)
+	pm.syncInputVisibility(true)
+	pm.rebuild()
+}
+
+func (pm *paneManager) closePane(target *chatPane) {
+	panes := pm.allPanes()
+	if len(panes) <= 1 || target == nil {
+		return
+	}
+	var next *chatPane
+	for i, p := range panes {
+		if p == target {
+			if i > 0 {
+				next = panes[i-1]
+			} else if i+1 < len(panes) {
+				next = panes[i+1]
+			}
+			break
+		}
+	}
+	pm.root.remove(target)
+	pm.focused = next
+	if pm.focused != nil {
+		pm.focused.setFocused(true)
+	}
+	pm.syncInputVisibility(false)
+	pm.rebuild()
+}
+
 func (pm *paneManager) closeFocused() {
 	panes := pm.allPanes()
 	if len(panes) <= 1 || pm.focused == nil {
