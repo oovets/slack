@@ -1,4 +1,4 @@
 [run]
-dev = "sleep infinity"
+dev = "tail -f /dev/null"
 build = "true"
 "build:dev" = "true"
