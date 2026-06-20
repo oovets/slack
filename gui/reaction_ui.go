@@ -105,11 +105,12 @@ func (c *reactionChip) applyHoverTint() {
 type reactionChipRenderer struct{ chip *reactionChip }
 
 const (
-	chipPadX   = float32(7)
-	chipPadY   = float32(2)
-	chipInnerG = float32(4)
-	chipMinH   = float32(22)
+	chipPadX   = float32(6)
+	chipPadY   = float32(1)
+	chipInnerG = float32(3)
+	chipMinH   = float32(20)
 )
+
 
 func (r *reactionChipRenderer) MinSize() fyne.Size {
 	em := r.chip.emoji.MinSize()
@@ -208,9 +209,8 @@ func (b *addReactionBtn) MouseMoved(_ *desktop.MouseEvent) {}
 type addReactionBtnRenderer struct{ btn *addReactionBtn }
 
 func (r *addReactionBtnRenderer) MinSize() fyne.Size {
-	// Square-ish, matches reaction chip height.
 	h := chipMinH
-	return fyne.NewSize(h + 6, h)
+	return fyne.NewSize(h + 2, h)
 }
 func (r *addReactionBtnRenderer) Layout(size fyne.Size) {
 	r.btn.bg.Move(fyne.NewPos(0, 0))
@@ -222,6 +222,29 @@ func (r *addReactionBtnRenderer) Layout(size fyne.Size) {
 func (r *addReactionBtnRenderer) Refresh()                     { r.btn.bg.Refresh(); r.btn.plus.Refresh() }
 func (r *addReactionBtnRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.btn.bg, r.btn.plus} }
 func (r *addReactionBtnRenderer) Destroy()                     {}
+
+// newIconActionButton renders a compact icon-only action chip (same
+// footprint as the "+" reaction button) for actions like Reply that
+// belong on the same row as the reaction chips.
+func newIconActionButton(glyph, _tooltip string, onTap func()) fyne.CanvasObject {
+	if onTap == nil {
+		return nil
+	}
+	bg := canvas.NewRectangle(palette.ChipAddBG)
+	bg.CornerRadius = 12
+	bg.StrokeColor = palette.ChipAddBorder
+	bg.StrokeWidth = 1
+
+	icon := canvas.NewText(glyph, palette.ChipAddText)
+	icon.TextSize = reactionCountTextSize() + 1
+	icon.TextStyle = fyne.TextStyle{Bold: true}
+	icon.Alignment = fyne.TextAlignCenter
+
+	btn := &addReactionBtn{bg: bg, plus: icon, onTap: onTap}
+	btn.ExtendBaseWidget(btn)
+	return btn
+}
+
 
 // ===== Color helpers =====================================================
 
@@ -254,8 +277,9 @@ var commonReactionEmojis = []string{
 	"thinking_face", "white_check_mark",
 }
 
-const emojiPickerMaxResults = 80
-const emojiPickerColumns = 9
+const emojiPickerMaxResults = 56
+const emojiPickerColumns = 8
+
 
 var (
 	emojiNamesCache    []string
@@ -414,10 +438,11 @@ func (r *pickerCellRenderer) MinSize() fyne.Size {
 	if s.Height > side {
 		side = s.Height
 	}
-	side += 12
-	if side < 34 {
-		side = 34
+	side += 8
+	if side < 28 {
+		side = 28
 	}
+
 	return fyne.NewSize(side, side)
 }
 func (r *pickerCellRenderer) Layout(size fyne.Size) {
@@ -498,7 +523,7 @@ func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 	rebuild(current)
 
 	scrollGrid := container.NewVScroll(grid)
-	scrollGrid.SetMinSize(fyne.NewSize(420, 300))
+	scrollGrid.SetMinSize(fyne.NewSize(280, 220))
 
 	footer := container.NewBorder(nil, nil, hoverLabel, status, nil)
 
@@ -514,7 +539,7 @@ func showEmojiPicker(win fyne.Window, onPicked func(name string)) {
 		}
 		pick(entry.Text)
 	}, win)
-	form.Resize(fyne.NewSize(470, 430))
+	form.Resize(fyne.NewSize(320, 320))
 	form.Show()
 	if c := win.Canvas(); c != nil {
 		c.Focus(entry)
