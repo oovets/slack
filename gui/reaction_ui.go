@@ -277,8 +277,9 @@ var commonReactionEmojis = []string{
 	"thinking_face", "white_check_mark",
 }
 
-const emojiPickerMaxResults = 80
-const emojiPickerColumns = 9
+const emojiPickerMaxResults = 56
+const emojiPickerColumns = 8
+
 
 var (
 	emojiNamesCache    []string
