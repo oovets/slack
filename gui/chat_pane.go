@@ -223,11 +223,11 @@ func (p *chatPane) setInputVisible(visible bool, reveal bool) {
 	}
 	p.inputVisible = visible
 	if visible {
-		p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.inputCard}
+		p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.header, p.inputCard}
 	} else {
 		hiddenSpacer := canvas.NewRectangle(color.Transparent)
 		hiddenSpacer.SetMinSize(fyne.NewSize(1, 10))
-		p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, hiddenSpacer}
+		p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.header, hiddenSpacer}
 	}
 	p.panel.Refresh()
 	fyne.Do(func() {
