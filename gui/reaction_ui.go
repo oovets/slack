@@ -209,9 +209,8 @@ func (b *addReactionBtn) MouseMoved(_ *desktop.MouseEvent) {}
 type addReactionBtnRenderer struct{ btn *addReactionBtn }
 
 func (r *addReactionBtnRenderer) MinSize() fyne.Size {
-	// Square-ish, matches reaction chip height.
 	h := chipMinH
-	return fyne.NewSize(h + 6, h)
+	return fyne.NewSize(h + 2, h)
 }
 func (r *addReactionBtnRenderer) Layout(size fyne.Size) {
 	r.btn.bg.Move(fyne.NewPos(0, 0))
@@ -223,6 +222,29 @@ func (r *addReactionBtnRenderer) Layout(size fyne.Size) {
 func (r *addReactionBtnRenderer) Refresh()                     { r.btn.bg.Refresh(); r.btn.plus.Refresh() }
 func (r *addReactionBtnRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.btn.bg, r.btn.plus} }
 func (r *addReactionBtnRenderer) Destroy()                     {}
+
+// newIconActionButton renders a compact icon-only action chip (same
+// footprint as the "+" reaction button) for actions like Reply that
+// belong on the same row as the reaction chips.
+func newIconActionButton(glyph, _tooltip string, onTap func()) fyne.CanvasObject {
+	if onTap == nil {
+		return nil
+	}
+	bg := canvas.NewRectangle(palette.ChipAddBG)
+	bg.CornerRadius = 12
+	bg.StrokeColor = palette.ChipAddBorder
+	bg.StrokeWidth = 1
+
+	icon := canvas.NewText(glyph, palette.ChipAddText)
+	icon.TextSize = reactionCountTextSize() + 1
+	icon.TextStyle = fyne.TextStyle{Bold: true}
+	icon.Alignment = fyne.TextAlignCenter
+
+	btn := &addReactionBtn{bg: bg, plus: icon, onTap: onTap}
+	btn.ExtendBaseWidget(btn)
+	return btn
+}
+
 
 // ===== Color helpers =====================================================
 
