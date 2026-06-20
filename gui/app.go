@@ -91,16 +91,17 @@ const (
 // from the Fyne main goroutine (via fyne.Do) except paneReloadMu/paneReloadTimers
 // and realtimeMu/realtimeStop/realtimeRunning, which are protected by mutexes.
 type App struct {
-	client           *api.Client
-	info             *api.AuthInfo
-	appToken         string
-	users            map[string]string
-	userByHandle     map[string]string
-	userByID         map[string]string
-	userHandleByID   map[string]string // reverse of userByHandle: id → handle
-	userInfoByID     map[string]api.UserInfo
-	groupNameCache   map[string]string
-	pendingUserFetches sync.Map // set of user IDs being lazily fetched
+	client             *api.Client
+	info               *api.AuthInfo
+	appToken           string
+	users              map[string]string
+	userByHandle       map[string]string
+	userByID           map[string]string
+	userHandleByID     map[string]string // reverse of userByHandle: id → handle
+	userInfoByID       map[string]api.UserInfo
+	groupNameCache     map[string]string
+	pendingUserFetches sync.Map     // set of user IDs being lazily fetched
+	usersMu            sync.RWMutex // protects a.users against goroutine reads
 
 	realtimeStop    chan struct{}
 	realtimeRunning bool
@@ -585,7 +586,25 @@ func (a *App) loadInitialData() error {
 		a.channelByID[ch.ID] = ch
 	}
 	a.refreshChannelDisplayNames()
-	a.refreshRecentThreads()
+	// refreshRecentThreads makes up to 24 ChannelHistory API calls. Run it in
+	// the background so startup is not blocked. The sidebar shows immediately
+	// without threads; a second rebuildFilteredChannels follows on completion.
+	// All shared state is snapshotted here on the main goroutine to avoid races.
+	{
+		chanSnap := append([]api.Channel(nil), a.channels...)
+		userSnap := a.snapshotUsers()
+		labelSnap := make(map[string]string, len(a.channels))
+		for _, ch := range a.channels {
+			labelSnap[ch.ID] = a.chatListLabel(ch)
+		}
+		go func() {
+			entries := a.computeRecentThreads(chanSnap, userSnap, labelSnap)
+			fyne.Do(func() {
+				a.recentThreads = entries
+				a.rebuildFilteredChannels()
+			})
+		}()
+	}
 	a.rebuildFilteredChannels()
 
 	for _, p := range a.paneManager.allPanes() {
@@ -611,69 +630,15 @@ func (a *App) loadInitialData() error {
 }
 
 func (a *App) refreshRecentThreads() {
-	entries := make([]threadListEntry, 0, len(a.channels))
-	candidates := make([]api.Channel, 0, len(a.channels))
+	labelByID := make(map[string]string, len(a.channels))
 	for _, ch := range a.channels {
-		if strings.TrimSpace(ch.ID) == "" {
-			continue
-		}
-		if !ch.HasUnread && strings.TrimSpace(ch.LatestTS) == "" {
-			continue
-		}
-		candidates = append(candidates, ch)
+		labelByID[ch.ID] = a.chatListLabel(ch)
 	}
-	sort.SliceStable(candidates, func(i, j int) bool {
-		return api.ParseSlackTSOrZero(candidates[i].LatestTS).After(api.ParseSlackTSOrZero(candidates[j].LatestTS))
-	})
-	if len(candidates) > 24 {
-		candidates = candidates[:24]
-	}
-	for _, ch := range candidates {
-		if strings.TrimSpace(ch.ID) == "" {
-			continue
-		}
-		msgs, err := a.client.ChannelHistory(ch.ID, 80, a.users)
-		if err != nil {
-			continue
-		}
-		byRoot := map[string]threadListEntry{}
-		for _, m := range msgs {
-			root := strings.TrimSpace(m.ThreadTS)
-			if root == "" {
-				if m.ReplyCount <= 0 {
-					continue
-				}
-				root = strings.TrimSpace(m.TS)
-			}
-			if root == "" {
-				continue
-			}
-			existing, ok := byRoot[root]
-			if !ok || m.Time.After(existing.LastActivity) {
-				title := strings.TrimSpace(m.Text)
-				if title == "" {
-					title = "(no text)"
-				}
-				byRoot[root] = threadListEntry{
-					ChannelID:    ch.ID,
-					ChannelLabel: a.chatListLabel(ch),
-					ThreadTS:     root,
-					Title:        truncate(title, 70),
-					LastActivity: m.Time,
-				}
-			}
-		}
-		for _, t := range byRoot {
-			entries = append(entries, t)
-		}
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].LastActivity.After(entries[j].LastActivity)
-	})
-	if len(entries) > 10 {
-		entries = entries[:10]
-	}
-	a.recentThreads = entries
+	a.recentThreads = a.computeRecentThreads(
+		append([]api.Channel(nil), a.channels...),
+		a.snapshotUsers(),
+		labelByID,
+	)
 }
 
 func (a *App) refreshChannelDisplayNames() {
@@ -1100,7 +1065,7 @@ func (a *App) refreshPaneTitles() {
 		if strings.TrimSpace(p.threadTS) != "" {
 			p.setTitle(a.chatPrefix(ch) + name + " — thread")
 		} else {
-			p.setTitle(a.chatPrefix(ch) + name + " — " + a.info.TeamName)
+			p.setTitle(a.chatPrefix(ch) + name)
 		}
 		p.input.SetPlaceHolder(a.chatInputPlaceholder(ch))
 	}
@@ -1120,7 +1085,7 @@ func (a *App) assignChannelToFocusedPane(channelID string) {
 	p.threadTS = ""
 	p.setThreadBanner("")
 	p.replyTarget = nil
-	p.setTitle(fmt.Sprintf("%s%s — %s", a.chatPrefix(ch), p.channelName, a.info.TeamName))
+	p.setTitle(fmt.Sprintf("%s%s", a.chatPrefix(ch), p.channelName))
 	p.input.SetPlaceHolder(a.chatInputPlaceholder(ch))
 	a.setSelectedSidebarChannel(channelID)
 	p.clearMessages()
@@ -1198,14 +1163,17 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 	}
 	channelID := p.channelID
 	threadTS := strings.TrimSpace(p.threadTS)
+	// Snapshot a.users before the API call. a.users may be written on the main
+	// goroutine (fyne.Do in lazyResolveUserID) concurrently with this goroutine.
+	userMap := a.snapshotUsers()
 	var (
 		msgs []api.Message
 		err  error
 	)
 	if threadTS == "" {
-		msgs, err = a.client.ChannelHistory(channelID, 120, a.users)
+		msgs, err = a.client.ChannelHistory(channelID, 120, userMap)
 	} else {
-		msgs, err = a.client.ThreadReplies(channelID, threadTS, 120, a.users)
+		msgs, err = a.client.ThreadReplies(channelID, threadTS, 120, userMap)
 	}
 	fyne.Do(func() {
 		if p.channelID != channelID || strings.TrimSpace(p.threadTS) != threadTS {
@@ -1413,7 +1381,7 @@ func (a *App) exitThreadInPane(p *chatPane) {
 	p.setThreadBanner("")
 	p.replyTarget = nil
 	p.replyHolder.Hide()
-	p.setTitle(fmt.Sprintf("#%s — %s", p.channelName, a.info.TeamName))
+	p.setTitle(fmt.Sprintf("#%s", p.channelName))
 	a.schedulePaneScrollToBottom(p)
 	a.savePaneLayoutState()
 	go a.loadMessagesForPane(p)
@@ -1705,6 +1673,88 @@ func (a *App) buildUserDirectory(dir []api.UserInfo) {
 	}
 }
 
+// snapshotUsers returns a goroutine-safe copy of a.users.
+// Must be called from the Fyne main goroutine.
+func (a *App) snapshotUsers() map[string]string {
+	a.usersMu.RLock()
+	out := make(map[string]string, len(a.users))
+	for k, v := range a.users {
+		out[k] = v
+	}
+	a.usersMu.RUnlock()
+	return out
+}
+
+// computeRecentThreads discovers threads with recent activity from the given
+// channel snapshot and user map. It is safe to call from a background goroutine
+// because it reads only its own parameters, not shared App fields.
+func (a *App) computeRecentThreads(channels []api.Channel, userMap map[string]string, labelByID map[string]string) []threadListEntry {
+	entries := make([]threadListEntry, 0, len(channels))
+	candidates := make([]api.Channel, 0, len(channels))
+	for _, ch := range channels {
+		if strings.TrimSpace(ch.ID) == "" {
+			continue
+		}
+		if !ch.HasUnread && strings.TrimSpace(ch.LatestTS) == "" {
+			continue
+		}
+		candidates = append(candidates, ch)
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return api.ParseSlackTSOrZero(candidates[i].LatestTS).After(api.ParseSlackTSOrZero(candidates[j].LatestTS))
+	})
+	if len(candidates) > 5 {
+		candidates = candidates[:5]
+	}
+	for _, ch := range candidates {
+		if strings.TrimSpace(ch.ID) == "" {
+			continue
+		}
+		msgs, err := a.client.ChannelHistory(ch.ID, 80, userMap)
+		if err != nil {
+			continue
+		}
+		byRoot := map[string]threadListEntry{}
+		label := labelByID[ch.ID]
+		for _, m := range msgs {
+			root := strings.TrimSpace(m.ThreadTS)
+			if root == "" {
+				if m.ReplyCount <= 0 {
+					continue
+				}
+				root = strings.TrimSpace(m.TS)
+			}
+			if root == "" {
+				continue
+			}
+			existing, ok := byRoot[root]
+			if !ok || m.Time.After(existing.LastActivity) {
+				title := strings.TrimSpace(m.Text)
+				if title == "" {
+					title = "(no text)"
+				}
+				byRoot[root] = threadListEntry{
+					ChannelID:    ch.ID,
+					ChannelLabel: label,
+					ThreadTS:     root,
+					Title:        truncate(title, 70),
+					LastActivity: m.Time,
+				}
+			}
+		}
+		for _, t := range byRoot {
+			entries = append(entries, t)
+		}
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].LastActivity.After(entries[j].LastActivity)
+	})
+	if len(entries) > 10 {
+		entries = entries[:10]
+	}
+	return entries
+}
+
 func (a *App) dmDisplayName(userID string) string {
 	id := strings.TrimSpace(userID)
 	if id == "" {
@@ -1756,12 +1806,17 @@ func (a *App) isBotOrAppDM(userID string) bool {
 	}
 	info, ok := a.userInfoByID[id]
 	if !ok {
-		fetched, err := a.client.UserInfo(id)
-		if err != nil || fetched == nil {
-			return false
-		}
-		info = *fetched
-		a.userInfoByID[id] = info
+		go func() {
+			fetched, err := a.client.UserInfo(id)
+			if err != nil || fetched == nil {
+				return
+			}
+			fyne.Do(func() {
+				a.userInfoByID[id] = *fetched
+				a.rebuildFilteredChannels()
+			})
+		}()
+		return false
 	}
 	return info.IsBot || info.IsAppUser
 }
@@ -2144,7 +2199,10 @@ func (a *App) lazyResolveUserID(id string) {
 	go func() {
 		info, err := a.client.UserInfo(id)
 		if err != nil || info == nil {
-			return // leave in pendingFetches so we don't retry every message load
+			// Clear the pending flag so a transient error doesn't block all future
+			// retries for this user ID.
+			a.pendingUserFetches.Delete(id)
+			return
 		}
 		fyne.Do(func() {
 			a.userInfoByID[id] = *info
@@ -2167,7 +2225,9 @@ func (a *App) lazyResolveUserID(id string) {
 				return // already resolved, no reload needed
 			}
 			a.userByID[id] = name
+			a.usersMu.Lock()
 			a.users[id] = name
+			a.usersMu.Unlock()
 			// Reload panes to show the resolved display name.
 			for _, p := range a.paneManager.allPanes() {
 				if strings.TrimSpace(p.channelID) != "" {
@@ -2234,9 +2294,10 @@ func (a *App) openMediaDialog(f api.File) {
 	imageURL := strings.TrimSpace(f.BestImageURL())
 	if imageURL == "" {
 		if strings.TrimSpace(f.Permalink) != "" {
-			u := mustParseURL(f.Permalink)
-			dialog.ShowCustom("Media", "Close", widget.NewHyperlink(f.Name, u), a.win)
-			return
+			if u := parseDisplayURL(f.Permalink); u != nil {
+				dialog.ShowCustom("Media", "Close", widget.NewHyperlink(f.Name, u), a.win)
+				return
+			}
 		}
 		dialog.ShowInformation("Media", "No preview URL available for this file.", a.win)
 		return
@@ -2582,7 +2643,7 @@ func (a *App) applyInitialOpen() {
 		p.setThreadBanner("")
 	}
 	p.input.SetPlaceHolder(a.chatInputPlaceholder(ch))
-	p.setTitle(fmt.Sprintf("%s%s — %s", a.chatPrefix(ch), p.channelName, a.info.TeamName))
+	p.setTitle(fmt.Sprintf("%s%s", a.chatPrefix(ch), p.channelName))
 	a.schedulePaneScrollToBottom(p)
 	a.savePaneLayoutState()
 	go a.loadMessagesForPane(p)

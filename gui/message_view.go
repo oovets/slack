@@ -18,7 +18,6 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 	"github.com/stefan/slack-gui/api"
 )
@@ -32,6 +31,10 @@ var (
 	workspaceEmojiAliasByKey = map[string]string{}
 	avatarImageCache         sync.Map // url → fyne.Resource
 )
+
+// mediaHTTPClient is used for all outgoing image/avatar fetches. It applies a
+// fixed timeout so goroutines can't block indefinitely on slow or stalled URLs.
+var mediaHTTPClient = &http.Client{Timeout: 8 * time.Second}
 
 func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID string, win fyne.Window, showTimestamps bool, compact bool, onThread func(api.Message), onReply func(api.Message), onMedia func(api.File), onReaction func(api.Message, string), fetchMedia func(string) ([]byte, string, error), showHeader bool, inThreadView bool) fyne.CanvasObject {
 	name := senderName(m)
@@ -104,13 +107,7 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 		if showTimestamps {
 			metaRow = append(metaRow, ts)
 		}
-		if isFromMe {
-			sender.Alignment = fyne.TextAlignTrailing
-			head := container.NewHBox(metaRow...)
-			content = container.NewVBox(container.NewHBox(layout.NewSpacer(), head), rowWithMeta)
-		} else {
-			content = container.NewVBox(container.NewHBox(metaRow...), rowWithMeta)
-		}
+		content = container.NewVBox(container.NewHBox(metaRow...), rowWithMeta)
 	} else {
 		content = container.NewVBox(rowWithMeta)
 	}
@@ -136,36 +133,37 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 			continue
 		}
 		if strings.TrimSpace(f.Permalink) != "" {
-			link := widget.NewHyperlink(name, mustParseURL(f.Permalink))
-			link.Wrapping = fyne.TextWrapWord
-			rowWithMeta.Add(link)
+			if u := parseDisplayURL(f.Permalink); u != nil {
+				link := widget.NewHyperlink(name, u)
+				link.Wrapping = fyne.TextWrapWord
+				rowWithMeta.Add(link)
+			} else {
+				fileLabel := widget.NewLabel(name)
+				fileLabel.Wrapping = fyne.TextWrapWord
+				rowWithMeta.Add(fileLabel)
+			}
 		} else {
 			fileLabel := widget.NewLabel(name)
 			fileLabel.Wrapping = fyne.TextWrapWord
 			rowWithMeta.Add(fileLabel)
 		}
 	}
-	// redesign: lead each sender group with a colored avatar; grouped follow-up
-	// messages indent under an empty gutter so the column stays aligned (Slack-style).
-	var bodyWithAvatar fyne.CanvasObject = content
-	if !isFromMe {
-		avatarSize := float32(32)
-		if compact {
-			avatarSize = 20
-		}
-		avatarGap := float32(6)
-		if compact {
-			avatarGap = 4
-		}
-		var gutter fyne.CanvasObject
-		if showHeader {
-			gutter = newAvatarBubble(name, m.AvatarURL, avatarSize)
-		} else {
-			gutter = fixedWidthSpacer(avatarSize)
-		}
-		leftCol := container.NewVBox(gutter)
-		bodyWithAvatar = container.NewBorder(nil, nil, container.NewHBox(leftCol, fixedWidthSpacer(avatarGap)), nil, content)
+	// All messages use the same avatar-gutter layout regardless of sender.
+	avatarSize := float32(32)
+	if compact {
+		avatarSize = 20
 	}
+	avatarGap := float32(6)
+	if compact {
+		avatarGap = 4
+	}
+	var gutter fyne.CanvasObject
+	if showHeader {
+		gutter = newAvatarBubble(name, m.AvatarURL, avatarSize)
+	} else {
+		gutter = fixedWidthSpacer(avatarSize)
+	}
+	bodyWithAvatar := container.NewBorder(nil, nil, container.NewHBox(container.NewVBox(gutter), fixedWidthSpacer(avatarGap)), nil, content)
 	rowCanvas := applyMessageSideIndent(bodyWithAvatar)
 	if !showTimestamps {
 		rowCanvas = newTimestampToggleRow(rowCanvas, formatHoverTimestamp(m.Time), isFromMe)
@@ -329,12 +327,15 @@ func newAvatarBubble(name, avatarURL string, size float32) fyne.CanvasObject {
 }
 
 func fetchAvatarImage(rawURL string) (fyne.Resource, error) {
-	resp, err := http.Get(rawURL) //nolint:noctx
+	resp, err := mediaHTTPClient.Get(rawURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("avatar status %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20)) // 4 MB cap
 	if err != nil || len(data) == 0 {
 		return nil, err
 	}
@@ -371,15 +372,15 @@ func threadRootTS(m api.Message) string {
 	return strings.TrimSpace(m.TS)
 }
 
-func isLastInSenderGroup(msgs []api.Message, idx int) bool {
-	if idx+1 >= len(msgs) {
+func isFirstInSenderGroup(msgs []api.Message, idx int) bool {
+	if idx == 0 {
 		return true
 	}
-	cur, next := msgs[idx], msgs[idx+1]
-	if senderName(cur) != senderName(next) {
+	cur, prev := msgs[idx], msgs[idx-1]
+	if senderName(cur) != senderName(prev) {
 		return true
 	}
-	return next.Time.Sub(cur.Time) > 4*time.Minute
+	return cur.Time.Sub(prev.Time) > 4*time.Minute
 }
 
 func hoverSenderTextSize() float32 {
@@ -417,11 +418,8 @@ func fixedWidthSpacer(width float32) fyne.CanvasObject {
 	return r
 }
 
-func alignOutgoingRow(obj fyne.CanvasObject, isFromMe bool) fyne.CanvasObject {
-	if !isFromMe {
-		return obj
-	}
-	return container.NewBorder(nil, nil, layout.NewSpacer(), nil, obj)
+func alignOutgoingRow(obj fyne.CanvasObject, _ bool) fyne.CanvasObject {
+	return obj
 }
 
 func truncate(s string, n int) string {
@@ -447,10 +445,16 @@ func compactQuotedPreview(s string) string {
 	return string(r[:80]) + "\n" + string(r[80:160]) + "…"
 }
 
-func mustParseURL(raw string) *url.URL {
-	u, err := url.Parse(raw)
-	if err != nil {
-		u, _ = url.Parse("https://slack.com")
+func parseDisplayURL(raw string) *url.URL {
+	u, err := url.ParseRequestURI(strings.TrimSpace(raw))
+	if err != nil || u == nil {
+		return nil
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil
+	}
+	if strings.TrimSpace(u.Host) == "" {
+		return nil
 	}
 	return u
 }
@@ -477,9 +481,16 @@ func newAttachmentCardView(card api.AttachmentCard) fyne.CanvasObject {
 	}
 	if header != "" {
 		if strings.TrimSpace(card.TitleLink) != "" {
-			link := widget.NewHyperlink(renderSlackText(header), mustParseURL(card.TitleLink))
-			link.Wrapping = fyne.TextWrapWord
-			lines.Add(link)
+			if u := parseDisplayURL(card.TitleLink); u != nil {
+				link := widget.NewHyperlink(renderSlackText(header), u)
+				link.Wrapping = fyne.TextWrapWord
+				lines.Add(link)
+			} else {
+				lbl := widget.NewLabel(renderSlackText(header))
+				lbl.Wrapping = fyne.TextWrapWord
+				lbl.TextStyle = fyne.TextStyle{Bold: true}
+				lines.Add(lbl)
+			}
 		} else {
 			lbl := widget.NewLabel(renderSlackText(header))
 			lbl.Wrapping = fyne.TextWrapWord
@@ -567,7 +578,7 @@ func fetchPreviewImage(rawURL string, fetchMedia func(string) ([]byte, string, e
 		data, _, err := fetchMedia(u)
 		return data, err
 	}
-	resp, err := http.Get(u)
+	resp, err := mediaHTTPClient.Get(u)
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +586,7 @@ func fetchPreviewImage(rawURL string, fetchMedia func(string) ([]byte, string, e
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("image status %d", resp.StatusCode)
 	}
-	return io.ReadAll(resp.Body)
+	return io.ReadAll(io.LimitReader(resp.Body, 20<<20)) // 20 MB cap
 }
 
 func shouldUseSlackAuth(rawURL string) bool {
@@ -890,8 +901,8 @@ func fetchTwemojiResource(codes []string, onDone func(fyne.Resource)) {
 			cacheMiss(code)
 			continue
 		}
-		body, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 || readErr != nil || len(body) == 0 {
 			cacheMiss(code)
 			continue

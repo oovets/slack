@@ -96,13 +96,8 @@ func newVirtualMessageList() *virtualMessageList {
 func (v *virtualMessageList) renderRow(i int) fyne.CanvasObject {
 	m := v.msgs[i]
 	isFromMe := trimEq(m.UserID, v.ctx.currentUserID)
-	showHeader := isLastInSenderGroup(v.msgs, i)
-	if isFromMe {
-		// Always show own sender header so the name appears above outgoing text.
-		showHeader = true
-	}
-	mentionedMe := m.MentionedMe || messageMentionsUser(m.Text, v.ctx.selfUserID)
-	return renderMessageRow(m, isFromMe, mentionedMe, v.ctx.selfUserID, v.ctx.win, v.ctx.showTimestamps, v.ctx.compact, v.ctx.onThread, v.ctx.onReply, v.ctx.onMedia, v.ctx.onReaction, v.ctx.fetchMedia, showHeader, v.ctx.inThreadView)
+	showHeader := isFirstInSenderGroup(v.msgs, i)
+	return renderMessageRow(m, isFromMe, m.MentionedMe, v.ctx.selfUserID, v.ctx.win, v.ctx.showTimestamps, v.ctx.compact, v.ctx.onThread, v.ctx.onReply, v.ctx.onMedia, v.ctx.onReaction, v.ctx.fetchMedia, showHeader, v.ctx.inThreadView)
 }
 
 // setMessages swaps in a new history and refreshes the visible window only.

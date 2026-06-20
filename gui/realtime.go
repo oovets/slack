@@ -88,6 +88,7 @@ func (a *App) runSocketModeSession(stop <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+	conn.SetReadLimit(4 << 20) // 4 MB per message
 	defer conn.Close()
 	a.setStatusTemporaryFromRealtime("Realtime connected (socket mode)", 3*time.Second)
 
@@ -137,6 +138,7 @@ func (a *App) runRTMSession(stop <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+	conn.SetReadLimit(4 << 20) // 4 MB per message
 	defer conn.Close()
 	a.setStatusTemporaryFromRealtime("Realtime connected", 3*time.Second)
 

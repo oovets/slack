@@ -292,7 +292,11 @@ func fontDefFromFontConfig(family string) (fontDef, bool) {
 	if family == "" {
 		return fontDef{}, false
 	}
-	cmd := exec.Command("fc-list", "--format=%{file}\t%{family}\t%{style}\n")
+	fcList, ok := resolveFCListPath()
+	if !ok {
+		return fontDef{}, false
+	}
+	cmd := exec.Command(fcList, "--format=%{file}\t%{family}\t%{style}\n")
 	out, err := cmd.Output()
 	if err != nil || len(out) == 0 {
 		return fontDef{}, false
@@ -346,6 +350,23 @@ func fontDefFromFontConfig(family string) (fontDef, bool) {
 		return fontDef{}, false
 	}
 	return def, true
+}
+
+func resolveFCListPath() (string, bool) {
+	for _, path := range []string{"/usr/bin/fc-list", "/bin/fc-list"} {
+		if st, err := os.Stat(path); err == nil && !st.IsDir() {
+			return path, true
+		}
+	}
+	path, err := exec.LookPath("fc-list")
+	if err != nil {
+		return "", false
+	}
+	clean := filepath.Clean(path)
+	if !filepath.IsAbs(clean) {
+		return "", false
+	}
+	return clean, true
 }
 
 type compactTheme struct {

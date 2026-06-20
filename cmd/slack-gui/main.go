@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/stefan/slack-gui/api"
 	"github.com/stefan/slack-gui/gui"
@@ -14,8 +15,8 @@ func init() {
 	if err != nil {
 		homeDir = "/tmp"
 	}
-	logFile := homeDir + "/.slack-gui.log"
-	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logFile := filepath.Join(homeDir, ".slack-gui.log")
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 
 	var w io.Writer = os.Stdout
 	if err == nil {
