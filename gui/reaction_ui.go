@@ -438,10 +438,11 @@ func (r *pickerCellRenderer) MinSize() fyne.Size {
 	if s.Height > side {
 		side = s.Height
 	}
-	side += 12
-	if side < 34 {
-		side = 34
+	side += 8
+	if side < 28 {
+		side = 28
 	}
+
 	return fyne.NewSize(side, side)
 }
 func (r *pickerCellRenderer) Layout(size fyne.Size) {
