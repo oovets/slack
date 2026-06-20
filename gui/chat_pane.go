@@ -179,7 +179,25 @@ func (p *chatPane) setFocused(focused bool) {
 	_ = focused
 }
 
-func (p *chatPane) setTitle(t string) { p.title.SetText(t) }
+func (p *chatPane) setTitle(t string) {
+	p.title.SetText(t)
+	if p.headerTitle != nil {
+		name := strings.TrimSpace(p.channelName)
+		if name == "" {
+			name = t
+		}
+		p.headerTitle.Text = name
+		p.headerTitle.Refresh()
+	}
+	if p.headerSub != nil {
+		sub := ""
+		if idx := strings.Index(t, " — "); idx >= 0 {
+			sub = strings.TrimSpace(t[idx+len(" — "):])
+		}
+		p.headerSub.Text = sub
+		p.headerSub.Refresh()
+	}
+}
 
 func (p *chatPane) setThreadBanner(text string) {
 	if p.threadHolder == nil || p.threadLabel == nil {
