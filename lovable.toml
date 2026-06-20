@@ -2,3 +2,6 @@
 dev = ".lovable/dev.sh"
 build = "true"
 "build:dev" = "true"
+"dist-check" = "true"
+lint = "true"
+test = "true"
