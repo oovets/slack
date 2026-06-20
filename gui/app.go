@@ -1194,7 +1194,7 @@ func (a *App) loadMessagesForPane(p *chatPane) {
 			msgs[i].Text = a.formatMentionsForDisplay(msgs[i].Text)
 			msgs[i].ForwardedText = a.formatMentionsForDisplay(msgs[i].ForwardedText)
 		}
-		p.setMessages(msgs, a.info.UserID, a.info.UserID, a.showTimestamps, func(m api.Message) {
+		p.setMessages(msgs, a.info.UserID, a.info.UserID, a.win, a.showTimestamps, func(m api.Message) {
 			a.openThreadInPane(p, m)
 		}, func(m api.Message) {
 			a.setReplyTarget(p, m)
