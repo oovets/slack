@@ -127,11 +127,39 @@ func newChatPane(onActivate func(*chatPane), onSend func(*chatPane), onExitThrea
 		p.input,
 	)
 	entryRow := container.NewStack(p.inputBg, p.inputBorder, inner)
-	p.inputCard = container.NewVBox(p.inputTopGap, p.threadHolder, p.replyHolder, container.NewPadded(entryRow))
+	formatBar := newFormatBar(p.input)
+	composer := container.NewVBox(formatBar, entryRow)
+	p.inputCard = container.NewVBox(p.inputTopGap, p.threadHolder, p.replyHolder, container.NewPadded(composer))
+
+	// Channel header bar (purple "#"-tile + name + topic) painted at top.
+	p.headerTitle = canvas.NewText("Select a channel", color.NRGBA{R: 240, G: 242, B: 247, A: 255})
+	p.headerTitle.TextStyle = fyne.TextStyle{Bold: true}
+	p.headerTitle.TextSize = 14
+	p.headerSub = canvas.NewText("", palette.SectionLabel)
+	p.headerSub.TextSize = 11
+	tileBg := canvas.NewRectangle(palette.ChannelTileBG)
+	tileBg.CornerRadius = 8
+	tileBg.SetMinSize(fyne.NewSize(30, 30))
+	hash := canvas.NewText("#", palette.ChannelTileFG)
+	hash.TextStyle = fyne.TextStyle{Bold: true}
+	hash.TextSize = 15
+	hash.Alignment = fyne.TextAlignCenter
+	tile := container.NewStack(tileBg, container.NewCenter(hash))
+	headerRow := container.NewHBox(
+		fixedWidthSpacer(12), tile, fixedWidthSpacer(10),
+		container.NewVBox(p.headerTitle, p.headerSub),
+	)
+	headerBg := canvas.NewRectangle(palette.TopBarBG)
+	headerDiv := canvas.NewRectangle(color.NRGBA{R: 255, G: 255, B: 255, A: 14})
+	headerDiv.SetMinSize(fyne.NewSize(1, 1))
+	p.header = container.NewStack(
+		headerBg,
+		container.NewBorder(layoutSpacerH(6), headerDiv, nil, nil, headerRow),
+	)
 
 	p.inputVisible = true
-	p.viewport = container.NewBorder(nil, p.inputCard, nil, nil, p.msgScroll)
-	p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.inputCard}
+	p.viewport = container.NewBorder(p.header, p.inputCard, nil, nil, p.msgScroll)
+	p.viewport.Objects = []fyne.CanvasObject{p.msgScroll, p.header, p.inputCard}
 	p.panel = container.NewMax(p.viewport)
 	p.root = newPaneSurface(p.panel, func() {
 		if onActivate != nil {
