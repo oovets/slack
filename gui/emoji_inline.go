@@ -70,7 +70,7 @@ func inlineBodyColor(isFromMe bool) color.Color {
 }
 
 func inlineBodyTextSize() float32 {
-	return fyne.CurrentApp().Settings().Theme().Size("text")
+	return theme.TextSize()
 }
 
 // renderSlackTextNoEmoji is the existing renderer minus the unicode
