@@ -5,6 +5,13 @@ Standalone Slack desktop client built with Go and Fyne.
 This is an unofficial client and is not affiliated with, endorsed by, or
 supported by Slack Technologies, LLC.
 
+![Slack GUI screenshot](docs/screenshot.png)
+
+## Downloads
+
+Prebuilt release artifacts are published on the
+[GitHub Releases page](https://github.com/oovets/slack/releases).
+
 ## Project Layout
 
 - `api` - Slack API client (channels, history, threads, media)

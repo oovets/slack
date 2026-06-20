@@ -96,6 +96,6 @@ else
 fi
 
 echo "==> Checksums"
-(cd "${DIST_DIR}" && find . -maxdepth 1 -type f ! -name "checksums_${VERSION}.txt" -printf '%P\0' | sort -z | xargs -0 sha256sum > "checksums_${VERSION}.txt")
+(cd "${DIST_DIR}" && find . -maxdepth 1 -type f -name "slack-gui_${VERSION}_*" -printf '%P\0' | sort -z | xargs -0 sha256sum > "checksums_${VERSION}.txt")
 
 echo "Done. Artifacts are in ${DIST_DIR}"
