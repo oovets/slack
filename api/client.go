@@ -33,6 +33,7 @@ type UserInfo struct {
 	AvatarURL   string
 	IsBot       bool
 	IsAppUser   bool
+	IsDeleted   bool
 }
 
 type Channel struct {
@@ -320,7 +321,7 @@ func (c *Client) UserDirectory() ([]UserInfo, error) {
 			return nil, err
 		}
 		for _, m := range out.Members {
-			if strings.TrimSpace(m.ID) == "" || m.Deleted {
+			if strings.TrimSpace(m.ID) == "" {
 				continue
 			}
 			users = append(users, UserInfo{
@@ -331,6 +332,7 @@ func (c *Client) UserDirectory() ([]UserInfo, error) {
 				AvatarURL:   strings.TrimSpace(m.Profile.Image72),
 				IsBot:       m.IsBot,
 				IsAppUser:   m.IsAppUser,
+				IsDeleted:   m.Deleted,
 			})
 		}
 		cursor = strings.TrimSpace(out.ResponseMetadata.NextCursor)
@@ -352,6 +354,7 @@ func (c *Client) UserInfo(userID string) (*UserInfo, error) {
 		slackEnvelope
 		User struct {
 			ID        string `json:"id"`
+			Deleted   bool   `json:"deleted"`
 			Name      string `json:"name"`
 			IsBot     bool   `json:"is_bot"`
 			IsAppUser bool   `json:"is_app_user"`
@@ -373,6 +376,7 @@ func (c *Client) UserInfo(userID string) (*UserInfo, error) {
 		AvatarURL:   strings.TrimSpace(out.User.Profile.Image72),
 		IsBot:       out.User.IsBot,
 		IsAppUser:   out.User.IsAppUser,
+		IsDeleted:   out.User.Deleted,
 	}, nil
 }
 

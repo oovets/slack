@@ -44,6 +44,7 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 	body := newMessageBody(m.Text, isFromMe)
 	row := container.NewVBox(alignOutgoingRow(body, isFromMe))
 	rowWithMeta := container.NewVBox()
+	var actionRow fyne.CanvasObject
 	if quoted := strings.TrimSpace(renderSlackText(m.ForwardedText)); quoted != "" {
 		preview := compactQuotedPreview(quoted)
 		quoteText := widget.NewLabel("↪ " + preview)
@@ -94,7 +95,7 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 			actionsRow.Add(newIconActionButton("↩", "Reply in thread", func() { onReply(m) }))
 		}
 		if len(actionsRow.Objects) > 0 {
-			rowWithMeta.Add(alignOutgoingRow(actionsRow, isFromMe))
+			actionRow = alignOutgoingRow(actionsRow, isFromMe)
 		}
 	}
 
@@ -176,10 +177,102 @@ func renderMessageRow(m api.Message, isFromMe bool, mentionedMe bool, selfUserID
 		bar := canvas.NewRectangle(palette.MentionAmber)
 		bar.SetMinSize(fyne.NewSize(3, 1))
 		barWrap := container.NewBorder(nil, nil, bar, nil, rowCanvas)
-		return container.NewMax(bg, barWrap)
+		rowCanvas = container.NewMax(bg, barWrap)
+	}
+	if actionRow != nil {
+		return newMessageActionHover(rowCanvas, actionRow)
 	}
 	return rowCanvas
 }
+
+type messageActionHover struct {
+	widget.BaseWidget
+	content fyne.CanvasObject
+	actions fyne.CanvasObject
+}
+
+func newMessageActionHover(content fyne.CanvasObject, actions fyne.CanvasObject) *messageActionHover {
+	r := &messageActionHover{content: content, actions: actions}
+	r.ExtendBaseWidget(r)
+	if r.actions != nil {
+		r.actions.Hide()
+	}
+	return r
+}
+
+func (r *messageActionHover) CreateRenderer() fyne.WidgetRenderer {
+	return &messageActionHoverRenderer{row: r}
+}
+
+func (r *messageActionHover) MouseIn(_ *desktop.MouseEvent) {
+	if r.actions != nil {
+		r.actions.Show()
+		r.actions.Refresh()
+	}
+}
+
+func (r *messageActionHover) MouseOut() {
+	if r.actions != nil {
+		r.actions.Hide()
+		r.actions.Refresh()
+	}
+}
+
+func (r *messageActionHover) MouseMoved(_ *desktop.MouseEvent) {}
+
+type messageActionHoverRenderer struct {
+	row *messageActionHover
+}
+
+func (r *messageActionHoverRenderer) MinSize() fyne.Size {
+	if r.row.content == nil {
+		return fyne.NewSize(0, 0)
+	}
+	return r.row.content.MinSize()
+}
+
+func (r *messageActionHoverRenderer) Layout(size fyne.Size) {
+	if r.row.content != nil {
+		r.row.content.Move(fyne.NewPos(0, 0))
+		r.row.content.Resize(size)
+	}
+	if r.row.actions == nil {
+		return
+	}
+	actionSize := r.row.actions.MinSize()
+	x := size.Width - actionSize.Width - 10
+	if x < 0 {
+		x = 0
+	}
+	y := size.Height - actionSize.Height
+	if y < 0 {
+		y = 0
+	}
+	r.row.actions.Move(fyne.NewPos(x, y))
+	r.row.actions.Resize(actionSize)
+}
+
+func (r *messageActionHoverRenderer) Refresh() {
+	if r.row.content != nil {
+		r.row.content.Refresh()
+	}
+	if r.row.actions != nil {
+		r.row.actions.Refresh()
+	}
+}
+
+func (r *messageActionHoverRenderer) Objects() []fyne.CanvasObject {
+	objects := make([]fyne.CanvasObject, 0, 2)
+	if r.row.content != nil {
+		objects = append(objects, r.row.content)
+	}
+	if r.row.actions != nil {
+		objects = append(objects, r.row.actions)
+	}
+	return objects
+}
+
+func (r *messageActionHoverRenderer) Destroy() {}
 
 // fixedHeightSpacer is a vertical spacer used to add breathing room
 // between sender groups without inflating min-width.

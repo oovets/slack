@@ -501,7 +501,7 @@ func (a *App) buildSidebar() {
 	a.sidebarBg = bg
 	// Pad top/right/bottom but not left — list rows already have their own left inset.
 	inner := container.NewBorder(layoutSpacerH(4), layoutSpacerH(4), nil, fixedWidthSpacer(4), left)
-	a.chatListPane = newFixedWidthWrap(container.NewMax(bg, inner), 238)
+	a.chatListPane = newFixedWidthWrap(container.NewMax(bg, inner), 204)
 	if !a.showChatList {
 		a.chatListPane.setShown(false)
 	}
@@ -709,7 +709,7 @@ func (a *App) rebuildFilteredChannels() {
 		if !ch.IsIM && !ch.IsMPIM && !ch.IsMember {
 			continue
 		}
-		if ch.IsIM && strings.TrimSpace(a.chatBaseName(ch)) == "direct message" {
+		if ch.IsIM && (a.isDeletedUserDM(ch.UserID) || strings.TrimSpace(a.chatBaseName(ch)) == "direct message") {
 			continue
 		}
 		candidate := strings.ToLower(strings.TrimSpace(a.chatBaseName(ch)))
@@ -855,7 +855,7 @@ func (a *App) updateChatListWidth() {
 	if a.chatListPane == nil {
 		return
 	}
-	const target = float32(238)
+	const target = float32(204)
 	if a.chatListPane.width == target {
 		return
 	}
@@ -1656,6 +1656,9 @@ func (a *App) buildUserDirectory(dir []api.UserInfo) {
 			continue
 		}
 		a.userInfoByID[id] = u
+		if u.IsDeleted {
+			continue
+		}
 		display := strings.TrimSpace(u.DisplayName)
 		if display == "" {
 			display = strings.TrimSpace(u.RealName)
@@ -1821,6 +1824,18 @@ func (a *App) isBotOrAppDM(userID string) bool {
 		return false
 	}
 	return info.IsBot || info.IsAppUser
+}
+
+func (a *App) isDeletedUserDM(userID string) bool {
+	id := strings.TrimSpace(userID)
+	if id == "" {
+		return false
+	}
+	info, ok := a.userInfoByID[id]
+	if !ok {
+		return false
+	}
+	return info.IsDeleted
 }
 
 func (a *App) isSectionCollapsed(section string) bool {
