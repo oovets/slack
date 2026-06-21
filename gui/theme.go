@@ -391,13 +391,12 @@ type themePalette struct {
 	shadow          color.NRGBA
 }
 
-// darkPalette: refined to the redesign tokens — deeper, calmer ground,
-// brighter foreground for legibility, softer translucent separators/hover.
+// darkPalette: warm charcoal ground built around #1f1f1d.
 var darkPalette = themePalette{
-	background:      color.NRGBA{R: 22, G: 23, B: 30, A: 255},    // #16171e
-	inputBackground: color.NRGBA{R: 33, G: 35, B: 46, A: 255},    // #21232e
-	foreground:      color.NRGBA{R: 230, G: 233, B: 240, A: 255}, // #e6e9f0
-	mutedForeground: color.NRGBA{R: 122, G: 128, B: 147, A: 255}, // #7a8093
+	background:      color.NRGBA{R: 31, G: 31, B: 29, A: 255},    // #1f1f1d
+	inputBackground: color.NRGBA{R: 39, G: 39, B: 37, A: 255},    // #272725
+	foreground:      color.NRGBA{R: 230, G: 233, B: 235, A: 255}, // #e6e9eb
+	mutedForeground: color.NRGBA{R: 122, G: 122, B: 118, A: 255}, // #7a7a76
 	separator:       color.NRGBA{R: 255, G: 255, B: 255, A: 20},
 	hover:           color.NRGBA{R: 255, G: 255, B: 255, A: 16},
 	focus:           color.NRGBA{R: 91, G: 141, B: 255, A: 180},
@@ -538,13 +537,28 @@ func (t *compactTheme) Font(style fyne.TextStyle) fyne.Resource {
 		if fs.boldItalic != nil {
 			return fs.boldItalic
 		}
+		if fs.bold != nil {
+			return fs.bold
+		}
+		if fs.italic != nil {
+			return fs.italic
+		}
+		if fs.regular != nil {
+			return fs.regular
+		}
 	case style.Bold:
 		if fs.bold != nil {
 			return fs.bold
 		}
+		if fs.regular != nil {
+			return fs.regular
+		}
 	case style.Italic:
 		if fs.italic != nil {
 			return fs.italic
+		}
+		if fs.regular != nil {
+			return fs.regular
 		}
 	default:
 		if fs.regular != nil {

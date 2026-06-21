@@ -88,11 +88,11 @@ var darkUIColors = uiPalette{
 	MentionAmber:  color.NRGBA{R: 242, G: 199, B: 68, A: 255},
 	HereMentionBG: color.NRGBA{R: 30, G: 80, B: 160, A: 55},
 
-	SidebarBG:      color.NRGBA{R: 15, G: 17, B: 24, A: 255},
+	SidebarBG:      color.NRGBA{R: 22, G: 22, B: 20, A: 255},
 	SidebarHover:   color.NRGBA{R: 255, G: 255, B: 255, A: 12},
 	SidebarSelBG:   color.NRGBA{R: 91, G: 141, B: 255, A: 36},
 	SidebarSelText: color.NRGBA{R: 255, G: 255, B: 255, A: 255},
-	SectionLabel:   color.NRGBA{R: 107, G: 113, B: 133, A: 255},
+	SectionLabel:   color.NRGBA{R: 107, G: 107, B: 103, A: 255},
 
 	BadgeMutedBG:     color.NRGBA{R: 255, G: 255, B: 255, A: 28},
 	BadgeMutedText:   color.NRGBA{R: 200, G: 202, B: 209, A: 255},
@@ -103,16 +103,16 @@ var darkUIColors = uiPalette{
 
 	ChannelTileBG:  color.NRGBA{R: 167, G: 139, B: 250, A: 46},
 	ChannelTileFG:  color.NRGBA{R: 196, G: 181, B: 253, A: 255},
-	PaneHeaderBG:   color.NRGBA{R: 20, G: 20, B: 29, A: 255},
+	PaneHeaderBG:   color.NRGBA{R: 28, G: 28, B: 26, A: 255},
 	PaneHeaderLine: color.NRGBA{R: 255, G: 255, B: 255, A: 18},
 
-	ComposerBG:     color.NRGBA{R: 26, G: 29, B: 40, A: 255},
+	ComposerBG:     color.NRGBA{R: 37, G: 37, B: 35, A: 255},
 	ComposerBorder: color.NRGBA{R: 255, G: 255, B: 255, A: 18},
 	SendButtonBG:   color.NRGBA{R: 59, G: 130, B: 246, A: 255},
 	SendButtonFG:   color.NRGBA{R: 255, G: 255, B: 255, A: 255},
 
 	PresenceOnline: color.NRGBA{R: 74, G: 222, B: 128, A: 255},
-	TopBarBG:       color.NRGBA{R: 13, G: 15, B: 21, A: 255},
+	TopBarBG:       color.NRGBA{R: 20, G: 20, B: 18, A: 255},
 	SegmentBG:      color.NRGBA{R: 255, G: 255, B: 255, A: 14},
 	SegmentActive:  color.NRGBA{R: 255, G: 255, B: 255, A: 36},
 	SegmentText:    color.NRGBA{R: 220, G: 223, B: 230, A: 255},
